@@ -70,8 +70,9 @@ INSERT INTO slot (
     slot,
     weekday_name,
     interval,
-    priority_entry
+    priority_entry,
+    status_entry
 ) VALUES (
-    ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, 'Aberto'
 )
 RETURNING *;

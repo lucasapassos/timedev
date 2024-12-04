@@ -19,5 +19,6 @@ create table slot (
     weekday_name TEXT NOT NULL,
     interval INTEGER NOT NULL,
     priority_entry INTEGER NOT NULL,
+    status_entry TEXT NOT NULL,
     FOREIGN KEY(id_availability) REFERENCES availability(id_availability)
 )

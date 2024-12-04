@@ -126,11 +126,12 @@ INSERT INTO slot (
     slot,
     weekday_name,
     interval,
-    priority_entry
+    priority_entry,
+    status_entry
 ) VALUES (
-    ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, 'Aberto'
 )
-RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry
+RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry
 `
 
 type InsertSlotParams struct {

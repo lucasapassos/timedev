@@ -29,4 +29,5 @@ type Slot struct {
 	WeekdayName    string    `json:"weekday_name"`
 	Interval       int64     `json:"interval"`
 	PriorityEntry  int64     `json:"priority_entry"`
+	StatusEntry    string    `json:"status_entry"`
 }
