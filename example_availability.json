@@ -1,0 +1,12 @@
+{
+    "id_professional" : 123,
+    "init_datetime" : "2024-11-01 09:00:00",
+    "end_datetime" : "2024-11-30 23:00:00",
+    "init_hour" : "11:00",
+    "end_hour" : "14:00",
+    "type_availability" : 0,
+    "weekday_name" : "Monday",
+    "interval" : 30,
+    "priority_entry" : 0
+
+}
