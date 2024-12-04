@@ -4,7 +4,54 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"errors"
 )
+
+func computeWeekdayName(weekday string) (time.Weekday, error) {
+	var weekdayName time.Weekday
+	switch caseValue := weekday; caseValue {
+	case "Monday":
+		weekdayName = time.Monday
+	case "Tuesday":
+		weekdayName = time.Tuesday
+	case "Friday":
+		weekdayName = time.Friday
+	case "Thursday":
+		weekdayName = time.Thursday
+	case "Wednesday":
+		weekdayName = time.Wednesday
+	case "Sunday":
+		weekdayName = time.Sunday
+	case "Saturday":
+		weekdayName = time.Saturday
+	default:
+		return time.Monday, errors.New("weekday name not found")
+	}
+
+	return weekdayName, nil
+
+}
+
+func ComputeSlots(startDatetime, endDatetime string, weekday string, intervalDuration, typeavailability int, hour_init, hour_end string) ([]time.Time, error) {
+	layout := "2006-01-02 15:04:05"
+	start, _ := time.Parse(layout, startDatetime)
+	end, _ := time.Parse(layout, endDatetime)
+
+	weekdayName, err := computeWeekdayName(weekday)
+	if err != nil {
+		return nil, err
+	}
+
+	weekDayValids := CalculateWeekdayBetween(start, end, weekdayName, typeavailability)
+
+	slots, err := ComputeAgenda(hour_init, hour_end, weekDayValids, time.Duration(intervalDuration)*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+
+	return slots, nil
+}
 
 func CalculateWeekdayBetween(start, end time.Time, targetWeekday time.Weekday, typeInterval int) []time.Time {
 	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
@@ -22,7 +69,7 @@ func CalculateWeekdayBetween(start, end time.Time, targetWeekday time.Weekday, t
 
 	for !current.After(end) {
 
-		if typeInterval == 1 || typeInterval == 2 {
+		if typeInterval == 0 || typeInterval == 2 {
 			if current.Weekday() == targetWeekday && flag_biweekly {
 				matchingDay := time.Date(
 					current.Year(),
@@ -75,9 +122,9 @@ func SplitTimeRange(hourStart, hourEnd time.Time, interval time.Duration) []time
 	}
 
 	var slots []time.Time
-	// slots = append(slots, current)
-
 	current := hourStart
+	slots = append(slots, current)
+
 	// Keep adding intervals until we reach or exceed the end time
 	for current.Add(interval).Before(hourEnd) {
 		current = current.Add(interval)
@@ -90,12 +137,12 @@ func SplitTimeRange(hourStart, hourEnd time.Time, interval time.Duration) []time
 func ComputeAgenda(initialHour, endHour string, daysToCompute []time.Time, duration time.Duration) ([]time.Time, error) {
 	layout := "2006-01-02 15:04:05"
 
-	startTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s", initialHour))
+	startTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s:00", initialHour))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	endTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s", endHour))
+	endTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s:00", endHour))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -45,7 +45,7 @@ func SetupAndRunApp() error {
 
 	ctx := context.Background()
 	// create tables
-	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("drop table if exists authors; drop table if exists availability; %s", ddl)); err != nil {
+	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("drop table if exists slot; drop table if exists availability; %s", ddl)); err != nil {
 		log.Fatal(err)
 	}
 
