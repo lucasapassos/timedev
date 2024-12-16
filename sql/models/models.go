@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type Attribute struct {
+	IDAttribute    int64  `json:"id_attribute"`
+	IDProfessional int64  `json:"id_professional"`
+	Attribute      string `json:"attribute"`
+	Value          string `json:"value"`
+}
+
 type Availability struct {
 	IDAvailability   int64  `json:"id_availability"`
 	IDProfessional   int64  `json:"id_professional"`
@@ -19,6 +26,12 @@ type Availability struct {
 	WeekdayName      string `json:"weekday_name"`
 	Interval         int64  `json:"interval"`
 	PriorityEntry    int64  `json:"priority_entry"`
+}
+
+type Professional struct {
+	IDProfessional int64  `json:"id_professional"`
+	Especialidade  string `json:"especialidade"`
+	Nome           string `json:"nome"`
 }
 
 type Slot struct {

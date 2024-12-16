@@ -16,7 +16,6 @@ import (
 
 // MAIN - Setup and run
 func SetupAndRunApp() error {
-
 	log.Println("calling SetupAndRunApp()")
 
 	log.Println("calling LoadENV()")
@@ -27,7 +26,7 @@ func SetupAndRunApp() error {
 	}
 
 	log.Println("calling SetupLogging()")
-	//setup logging
+	// setup logging
 	errLog := logging.SetupLogging()
 	if errLog != nil {
 		return errLog
@@ -45,7 +44,7 @@ func SetupAndRunApp() error {
 
 	ctx := context.Background()
 	// create tables
-	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("drop table if exists slot; drop table if exists availability; %s", ddl)); err != nil {
+	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("drop table if exists slot; drop table if exists availability; drop table if exists professional; drop table if exists attribute; %s", ddl)); err != nil {
 		log.Fatal(err)
 	}
 
@@ -53,28 +52,28 @@ func SetupAndRunApp() error {
 	// create Echo app -
 	app := echo.New()
 
-	//API versioning
-	//v1 := app.Group("/v1")
-	//router.SetupV1Routes(v1)
+	// API versioning
+	// v1 := app.Group("/v1")
+	// router.SetupV1Routes(v1)
 
 	// Uses API key header - 'XApiKey'
-	//middleware.AddApiKeyAuth(app)
+	// middleware.AddApiKeyAuth(app)
 
 	// attach middleware
 	middleware.Recover(app)
 	middleware.Logger(app)
 
-	//Use CORS - change AllowOrigins to suit
+	// Use CORS - change AllowOrigins to suit
 	middleware.AddCors(app)
 
 	// setup routes
 	router.SetupRoutes(app)
 
-	//Add a rate limiter
-	//middleware.RateLimiter(app)
+	// Add a rate limiter
+	// middleware.RateLimiter(app)
 
-	//Add compression
-	//middleware.AddCompression(app)
+	// Add compression
+	// middleware.AddCompression(app)
 
 	// get the server port
 	port := os.Getenv("PORT")

@@ -32,12 +32,30 @@ func (q *Queries) GetExistingSlot(ctx context.Context, arg GetExistingSlotParams
 	return column_1, err
 }
 
+const insertAttribute = `-- name: InsertAttribute :exec
+INSERT INTO attribute (
+  id_professional,
+  attribute,
+  value
+) VALUES (
+  ?1,
+  ?2,
+  ?3
+)
+`
+
+type InsertAttributeParams struct {
+	IDProfessional int64  `json:"id_professional"`
+	Attribute      string `json:"attribute"`
+	Value          string `json:"value"`
+}
+
+func (q *Queries) InsertAttribute(ctx context.Context, arg InsertAttributeParams) error {
+	_, err := q.db.ExecContext(ctx, insertAttribute, arg.IDProfessional, arg.Attribute, arg.Value)
+	return err
+}
+
 const insertAvailability = `-- name: InsertAvailability :one
-
-
-
-
-
 INSERT INTO availability (
     id_professional,
     init_datetime,
@@ -66,31 +84,6 @@ type InsertAvailabilityParams struct {
 	PriorityEntry    int64  `json:"priority_entry"`
 }
 
-// -- name: GetAuthor :one
-// SELECT * FROM authors
-// WHERE id = ? LIMIT 1;
-// -- name: ListAuthors :many
-// SELECT * FROM authors
-// ORDER BY name;
-// -- name: CreateAuthor :one
-// INSERT INTO authors (
-//
-//	name, bio
-//
-// ) VALUES (
-//
-//	?, ?
-//
-// )
-// RETURNING *;
-// -- name: UpdateAuthor :exec
-// UPDATE authors
-// set name = ?,
-// bio = ?
-// WHERE id = ?;
-// -- name: DeleteAuthor :exec
-// DELETE FROM authors
-// WHERE id = ?;
 func (q *Queries) InsertAvailability(ctx context.Context, arg InsertAvailabilityParams) (Availability, error) {
 	row := q.db.QueryRowContext(ctx, insertAvailability,
 		arg.IDProfessional,
@@ -116,6 +109,58 @@ func (q *Queries) InsertAvailability(ctx context.Context, arg InsertAvailability
 		&i.Interval,
 		&i.PriorityEntry,
 	)
+	return i, err
+}
+
+const insertProfessional = `-- name: InsertProfessional :one
+
+
+
+
+
+INSERT INTO professional (
+  nome,
+  especialidade
+) VALUES (
+  ?, ?
+)
+RETURNING id_professional, especialidade, nome
+`
+
+type InsertProfessionalParams struct {
+	Nome          string `json:"nome"`
+	Especialidade string `json:"especialidade"`
+}
+
+// -- name: GetAuthor :one
+// SELECT * FROM authors
+// WHERE id = ? LIMIT 1;
+// -- name: ListAuthors :many
+// SELECT * FROM authors
+// ORDER BY name;
+// -- name: CreateAuthor :one
+// INSERT INTO authors (
+//
+//	name, bio
+//
+// ) VALUES (
+//
+//	?, ?
+//
+// )
+// RETURNING *;
+// -- name: UpdateAuthor :exec
+// UPDATE authors
+// set name = ?,
+// bio = ?
+// WHERE id = ?;
+// -- name: DeleteAuthor :exec
+// DELETE FROM authors
+// WHERE id = ?;
+func (q *Queries) InsertProfessional(ctx context.Context, arg InsertProfessionalParams) (Professional, error) {
+	row := q.db.QueryRowContext(ctx, insertProfessional, arg.Nome, arg.Especialidade)
+	var i Professional
+	err := row.Scan(&i.IDProfessional, &i.Especialidade, &i.Nome)
 	return i, err
 }
 

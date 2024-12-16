@@ -12,7 +12,8 @@ func SetupRoutes(app *echo.Echo) {
 	api.GET("/slots", handlers.HandleListSlots)
 	api.POST("/slot", handlers.HandleCreateAvailability)
 	api.GET("/slot/:id", handlers.HandleGetAvailability)
-
+	api.POST("/professional", handlers.HandleCreateProfessional)
+	api.POST("/professional/attributes", handlers.HandleCreateAttribute)
 	// // Group that requires authentication
 	// api := app.Group("/api")
 	// api.Use(middleware.KeycloakJWTMiddleware)

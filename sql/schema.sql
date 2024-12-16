@@ -8,8 +8,9 @@ create table availability (
     type_availability INTEGER NOT NULL,
     weekday_name TEXT NOT NULL,
     interval INTEGER NOT NULL,
-    priority_entry INTEGER NOT NULL
-); 
+    priority_entry INTEGER NOT NULL,
+    FOREIGN KEY(id_professional) REFERENCES professional(id_professional)
+  ); 
 
 create table slot (
     id_slot INTEGER PRIMARY KEY,
@@ -20,5 +21,19 @@ create table slot (
     interval INTEGER NOT NULL,
     priority_entry INTEGER NOT NULL,
     status_entry TEXT NOT NULL,
-    FOREIGN KEY(id_availability) REFERENCES availability(id_availability)
-)
+    FOREIGN KEY(id_availability) REFERENCES availability(id_availability),
+    FOREIGN KEY(id_professional) REFERENCES professional(id_professional)
+);
+
+create table professional (
+  id_professional INTEGER PRIMARY KEY,
+  especialidade TEXT NOT NULL,
+  nome TEXT NOT NULL
+);
+
+create table attribute (
+  id_attribute INTEGER PRIMARY KEY,
+  id_professional INTEGER NOT NULL,
+  attribute TEXT NOT NULL,
+  value TEXT NOT NULL
+);

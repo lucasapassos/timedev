@@ -24,6 +24,26 @@
 -- DELETE FROM authors
 -- WHERE id = ?;
 
+-- name: InsertProfessional :one
+INSERT INTO professional (
+  nome,
+  especialidade
+) VALUES (
+  ?, ?
+)
+RETURNING *;
+
+-- name: InsertAttribute :exec
+INSERT INTO attribute (
+  id_professional,
+  attribute,
+  value
+) VALUES (
+  @id_professional,
+  @attribute,
+  @value
+);
+
 -- name: InsertAvailability :one
 INSERT INTO availability (
     id_professional,

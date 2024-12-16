@@ -129,6 +129,7 @@ func HandleCreateAvailability(c echo.Context) error {
 
 }
 
+
 func HandleGetAvailability(c echo.Context) error {
 	ctx := context.Background()
 
