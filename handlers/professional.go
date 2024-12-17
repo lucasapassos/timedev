@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"timedev/db"
 	"timedev/sql/models"
@@ -42,30 +41,22 @@ func HandleCreateAttribute(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	attributeList := &[]models.Attribute{}
+	var attributeUnit models.Attribute
 
 	// Bind the incoming JSON data to the userInput struct
-	if err := c.Bind(attributeList); err != nil {
+	if err := c.Bind(&attributeUnit); err != nil {
 		log.Error().Err(err).Msg("Failed to bind request data")
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
-	var errorsLog []string
 	queries := models.New(db)
-	for _, attribute := range *attributeList {
-		err := queries.InsertAttribute(ctx, models.InsertAttributeParams{
-			attribute.IDProfessional,
-			attribute.Attribute,
-			attribute.Value,
-		})
-		if err != nil {
-			errorsLog = append(errorsLog, fmt.Sprintf("Failed to add attribute %s", attribute.Attribute))
-		}
+	insertedAttribute, err := queries.InsertAttribute(ctx, models.InsertAttributeParams{
+		IDProfessional: attributeUnit.IDProfessional,
+		Attribute:      attributeUnit.Attribute,
+		Value:          attributeUnit.Value,
+	})
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to insert Attribute"})
 	}
-
-	if len(errorsLog) > 0 {
-		return c.JSON(echo.ErrBadRequest.Code, errorsLog)
-	}
-
-	return c.JSON(http.StatusOK, attributeList)
+	return c.JSON(http.StatusOK, insertedAttribute)
 }

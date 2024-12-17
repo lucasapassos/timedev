@@ -32,7 +32,7 @@ func (q *Queries) GetExistingSlot(ctx context.Context, arg GetExistingSlotParams
 	return column_1, err
 }
 
-const insertAttribute = `-- name: InsertAttribute :exec
+const insertAttribute = `-- name: InsertAttribute :one
 INSERT INTO attribute (
   id_professional,
   attribute,
@@ -41,7 +41,7 @@ INSERT INTO attribute (
   ?1,
   ?2,
   ?3
-)
+) RETURNING id_attribute, id_professional, attribute, value
 `
 
 type InsertAttributeParams struct {
@@ -50,9 +50,16 @@ type InsertAttributeParams struct {
 	Value          string `json:"value"`
 }
 
-func (q *Queries) InsertAttribute(ctx context.Context, arg InsertAttributeParams) error {
-	_, err := q.db.ExecContext(ctx, insertAttribute, arg.IDProfessional, arg.Attribute, arg.Value)
-	return err
+func (q *Queries) InsertAttribute(ctx context.Context, arg InsertAttributeParams) (Attribute, error) {
+	row := q.db.QueryRowContext(ctx, insertAttribute, arg.IDProfessional, arg.Attribute, arg.Value)
+	var i Attribute
+	err := row.Scan(
+		&i.IDAttribute,
+		&i.IDProfessional,
+		&i.Attribute,
+		&i.Value,
+	)
+	return i, err
 }
 
 const insertAvailability = `-- name: InsertAvailability :one
@@ -232,4 +239,75 @@ func (q *Queries) ListAvailability(ctx context.Context, idAvailability int64) (A
 		&i.PriorityEntry,
 	)
 	return i, err
+}
+
+const listSlots = `-- name: ListSlots :many
+SELECT
+  id_slot,
+  id_professional,
+  id_availability,
+  slot,
+  weekday_name,
+  interval,
+  priority_entry,
+  status_entry
+FROM slot
+WHERE 1=1
+  AND datetime(slot) between datetime(?1) and datetime(?2)
+  AND CASE WHEN ?3 == true THEN id_professional == ?4 ELSE 1 END
+`
+
+type ListSlotsParams struct {
+	SlotInit       interface{} `json:"slot_init"`
+	SlotEnd        interface{} `json:"slot_end"`
+	IsProfessional interface{} `json:"is_professional"`
+	IDProfessional int64       `json:"id_professional"`
+}
+
+type ListSlotsRow struct {
+	IDSlot         int64     `json:"id_slot"`
+	IDProfessional int64     `json:"id_professional"`
+	IDAvailability int64     `json:"id_availability"`
+	Slot           time.Time `json:"slot"`
+	WeekdayName    string    `json:"weekday_name"`
+	Interval       int64     `json:"interval"`
+	PriorityEntry  int64     `json:"priority_entry"`
+	StatusEntry    string    `json:"status_entry"`
+}
+
+func (q *Queries) ListSlots(ctx context.Context, arg ListSlotsParams) ([]ListSlotsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSlots,
+		arg.SlotInit,
+		arg.SlotEnd,
+		arg.IsProfessional,
+		arg.IDProfessional,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSlotsRow
+	for rows.Next() {
+		var i ListSlotsRow
+		if err := rows.Scan(
+			&i.IDSlot,
+			&i.IDProfessional,
+			&i.IDAvailability,
+			&i.Slot,
+			&i.WeekdayName,
+			&i.Interval,
+			&i.PriorityEntry,
+			&i.StatusEntry,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

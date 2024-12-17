@@ -33,7 +33,7 @@ INSERT INTO professional (
 )
 RETURNING *;
 
--- name: InsertAttribute :exec
+-- name: InsertAttribute :one
 INSERT INTO attribute (
   id_professional,
   attribute,
@@ -42,7 +42,7 @@ INSERT INTO attribute (
   @id_professional,
   @attribute,
   @value
-);
+) RETURNING *;
 
 -- name: InsertAvailability :one
 INSERT INTO availability (
@@ -96,3 +96,18 @@ INSERT INTO slot (
     ?, ?, ?, ?, ?, ?, 'Aberto'
 )
 RETURNING *;
+
+-- name: ListSlots :many
+SELECT
+  id_slot,
+  id_professional,
+  id_availability,
+  slot,
+  weekday_name,
+  interval,
+  priority_entry,
+  status_entry
+FROM slot
+WHERE 1=1
+  AND datetime(slot) between datetime(@slot_init) and datetime(@slot_end)
+  AND CASE WHEN @is_professional == true THEN id_professional == @id_professional ELSE 1 END

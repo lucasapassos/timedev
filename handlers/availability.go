@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
 	"timedev/db"
 	"timedev/repository"
 	"timedev/sql/models"
@@ -126,9 +125,7 @@ func HandleCreateAvailability(c echo.Context) error {
 	tx.Commit()
 
 	return c.JSON(http.StatusOK, echo.Map{"availability ": insertedAvailability, "slots_added": slots_added, "slots_not_added": slot_non_added})
-
 }
-
 
 func HandleGetAvailability(c echo.Context) error {
 	ctx := context.Background()
@@ -143,13 +140,6 @@ func HandleGetAvailability(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for id availability."})
 	}
-
-	// var availabilityId custom_models.AvailabilityId
-	// // Bind the incoming JSON data to the userInput struct
-	// if err := c.Bind(&availabilityId); err != nil {
-	// 	log.Error().Err(err).Msg("Failed to bind request data")
-	// 	return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
-	// }
 
 	unitAvailability, err := queries.ListAvailability(ctx, availabilityId)
 	if err != nil {

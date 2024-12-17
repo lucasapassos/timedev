@@ -9,7 +9,7 @@ import (
 // Setup up API routes
 func SetupRoutes(app *echo.Echo) {
 	api := app.Group("/api")
-	api.GET("/slots", handlers.HandleListSlots)
+	api.GET("/slot", handlers.HandleListSlots)
 	api.POST("/slot", handlers.HandleCreateAvailability)
 	api.GET("/slot/:id", handlers.HandleGetAvailability)
 	api.POST("/professional", handlers.HandleCreateProfessional)
