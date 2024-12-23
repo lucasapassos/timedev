@@ -11,7 +11,7 @@ import (
 )
 
 type SlotUnit struct {
-	IDProfessional *int64 `query:"id_professional"`
+	IDProfessional int64  `query:"id_professional"`
 	SlotInit       string `query:"slot_init"`
 	SlotEnd        string `query:"slot_end"`
 }
@@ -28,7 +28,7 @@ func HandleListSlots(c echo.Context) error {
 	}
 
 	var is_professional bool
-	if slotUnit.IDProfessional == nil {
+	if slotUnit.IDProfessional != 0 {
 		is_professional = true
 	}
 
@@ -42,7 +42,7 @@ func HandleListSlots(c echo.Context) error {
 		SlotInit:       slotUnit.SlotInit,
 		SlotEnd:        slotUnit.SlotEnd,
 		IsProfessional: is_professional,
-		IDProfessional: *slotUnit.IDProfessional,
+		IDProfessional: slotUnit.IDProfessional,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})

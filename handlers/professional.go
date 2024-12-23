@@ -2,13 +2,57 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
+	"strconv"
 	"timedev/db"
 	"timedev/sql/models"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )
+
+func HandleGetProfessional(c echo.Context) error {
+	ctx := context.Background()
+	db := db.OpenDBConnection()
+	defer db.Close()
+
+	professionalIdStr := c.Param("idprofessional")
+	professionalId, err := strconv.ParseInt(professionalIdStr, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert professional id as int"})
+	}
+
+	queries := models.New(db)
+
+	professionalValue, err := queries.GetProfessionalInfo(ctx, professionalId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNoContent, err)
+		}
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	attributeValue, err := queries.ListAttributesByProfessionalId(ctx, professionalId)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	query_deleted := c.QueryParam("deleted")
+	var is_delete bool
+	if query_deleted == "1" {
+		is_delete = true
+	}
+	availabilityValue, err := queries.ListAvailabilityByProfessionalId(ctx, models.ListAvailabilityByProfessionalIdParams{
+		IDProfessional: professionalId,
+		Deleted:        is_delete,
+	})
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"professional": professionalValue, "attributes": attributeValue, "availability": availabilityValue})
+}
 
 func HandleCreateProfessional(c echo.Context) error {
 	ctx := context.Background()

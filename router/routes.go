@@ -9,9 +9,17 @@ import (
 // Setup up API routes
 func SetupRoutes(app *echo.Echo) {
 	api := app.Group("/api")
+
+	// availability
+	api.DELETE("/availability/:idavailability", handlers.HandleDeleteAvailability)
+	api.POST("/availability", handlers.HandleCreateAvailability)
+	api.GET("/availability/:id", handlers.HandleGetAvailability)
+
+	// slots
 	api.GET("/slot", handlers.HandleListSlots)
-	api.POST("/slot", handlers.HandleCreateAvailability)
-	api.GET("/slot/:id", handlers.HandleGetAvailability)
+
+	// professional
+	api.GET("/professional/:idprofessional", handlers.HandleGetProfessional)
 	api.POST("/professional", handlers.HandleCreateProfessional)
 	api.POST("/professional/attributes", handlers.HandleCreateAttribute)
 	// // Group that requires authentication

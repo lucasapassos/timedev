@@ -15,6 +15,60 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type AvailabilityUnit struct {
+	idavailability int64 `param:"idavailability"`
+}
+
+func HandleDeleteAvailability(c echo.Context) error {
+	ctx := context.Background()
+
+	db := db.OpenDBConnection()
+	defer db.Close()
+
+	availabilityIdStr := c.Param("idavailability")
+	availabilityId, err := strconv.ParseInt(availabilityIdStr, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for id availability."})
+	}
+
+	queries := models.New(db)
+
+	tx, err := db.Begin()
+	if err != nil {
+		return c.JSON(http.StatusBadGateway, echo.Map{"error": "Failed to initialize a transaction"})
+	}
+	defer tx.Rollback()
+
+	qtx := queries.WithTx(tx)
+
+	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, availabilityId)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to load slots from availability", "description": err.Error()})
+	}
+	if list_of_slots == nil {
+		return c.JSON(http.StatusNoContent, echo.Map{"error": "No slots to mark as deleted"})
+	}
+
+	var delete_slot_errors []string
+	for _, slot := range list_of_slots {
+		err := qtx.DeleteSlotById(ctx, slot)
+		if err != nil {
+			slotStr := strconv.FormatInt(slot, 10)
+			delete_slot_errors = append(delete_slot_errors, fmt.Sprint("Failed to mark slot as deleted", slotStr))
+		}
+	}
+
+	availabilityDeleted, err := qtx.DeleteAvailabilityById(ctx, availabilityId)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to mark availability as deleted."})
+	}
+
+	tx.Commit()
+
+	return c.JSON(http.StatusOK, echo.Map{"deleted": availabilityDeleted, "description": "The slots marked as deleted", "errors": delete_slot_errors})
+}
+
 func HandleCreateAvailability(c echo.Context) error {
 	ctx := context.Background()
 

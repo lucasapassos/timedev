@@ -10,10 +10,48 @@ import (
 	"time"
 )
 
+const deleteAvailabilityById = `-- name: DeleteAvailabilityById :one
+UPDATE availability
+SET is_deleted = 1
+WHERE id_availability == ?1
+RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, priority_entry, is_deleted
+`
+
+func (q *Queries) DeleteAvailabilityById(ctx context.Context, idAvailability int64) (Availability, error) {
+	row := q.db.QueryRowContext(ctx, deleteAvailabilityById, idAvailability)
+	var i Availability
+	err := row.Scan(
+		&i.IDAvailability,
+		&i.IDProfessional,
+		&i.InitDatetime,
+		&i.EndDatetime,
+		&i.InitHour,
+		&i.EndHour,
+		&i.TypeAvailability,
+		&i.WeekdayName,
+		&i.Interval,
+		&i.PriorityEntry,
+		&i.IsDeleted,
+	)
+	return i, err
+}
+
+const deleteSlotById = `-- name: DeleteSlotById :exec
+UPDATE slot
+SET is_deleted = 1
+WHERE id_slot == ?1
+`
+
+func (q *Queries) DeleteSlotById(ctx context.Context, idSlot int64) error {
+	_, err := q.db.ExecContext(ctx, deleteSlotById, idSlot)
+	return err
+}
+
 const getExistingSlot = `-- name: GetExistingSlot :one
 SELECT 1
 FROM slot s
 WHERE 1=1
+  AND is_deleted = 0
 	AND id_professional = ?
 	AND datetime(?) between datetime(slot) and datetime(slot, concat(s."interval" - 1, ' minute'))
     AND priority_entry = ?
@@ -30,6 +68,28 @@ func (q *Queries) GetExistingSlot(ctx context.Context, arg GetExistingSlotParams
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const getProfessionalInfo = `-- name: GetProfessionalInfo :one
+SELECT
+  id_professional,
+  nome,
+  especialidade
+FROM professional
+WHERE id_professional == ?1
+`
+
+type GetProfessionalInfoRow struct {
+	IDProfessional int64  `json:"id_professional"`
+	Nome           string `json:"nome"`
+	Especialidade  string `json:"especialidade"`
+}
+
+func (q *Queries) GetProfessionalInfo(ctx context.Context, idProfessional int64) (GetProfessionalInfoRow, error) {
+	row := q.db.QueryRowContext(ctx, getProfessionalInfo, idProfessional)
+	var i GetProfessionalInfoRow
+	err := row.Scan(&i.IDProfessional, &i.Nome, &i.Especialidade)
+	return i, err
 }
 
 const insertAttribute = `-- name: InsertAttribute :one
@@ -72,11 +132,12 @@ INSERT INTO availability (
     type_availability,
     weekday_name,
     interval,
-    priority_entry
+    priority_entry,
+    is_deleted
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
 )
-RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, priority_entry
+RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, priority_entry, is_deleted
 `
 
 type InsertAvailabilityParams struct {
@@ -115,6 +176,7 @@ func (q *Queries) InsertAvailability(ctx context.Context, arg InsertAvailability
 		&i.WeekdayName,
 		&i.Interval,
 		&i.PriorityEntry,
+		&i.IsDeleted,
 	)
 	return i, err
 }
@@ -179,11 +241,12 @@ INSERT INTO slot (
     weekday_name,
     interval,
     priority_entry,
-    status_entry
+    status_entry,
+    is_deleted
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, 'Aberto'
+    ?, ?, ?, ?, ?, ?, 'Aberto', 0
 )
-RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry
+RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, is_deleted
 `
 
 type InsertSlotParams struct {
@@ -207,6 +270,44 @@ func (q *Queries) InsertSlot(ctx context.Context, arg InsertSlotParams) error {
 	return err
 }
 
+const listAttributesByProfessionalId = `-- name: ListAttributesByProfessionalId :many
+SELECT
+  id_attribute,
+  attribute,
+  value
+FROM attribute
+WHERE id_professional == ?1
+`
+
+type ListAttributesByProfessionalIdRow struct {
+	IDAttribute int64  `json:"id_attribute"`
+	Attribute   string `json:"attribute"`
+	Value       string `json:"value"`
+}
+
+func (q *Queries) ListAttributesByProfessionalId(ctx context.Context, idProfessional int64) ([]ListAttributesByProfessionalIdRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAttributesByProfessionalId, idProfessional)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAttributesByProfessionalIdRow
+	for rows.Next() {
+		var i ListAttributesByProfessionalIdRow
+		if err := rows.Scan(&i.IDAttribute, &i.Attribute, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAvailability = `-- name: ListAvailability :one
 SELECT 
     id_availability,
@@ -218,7 +319,8 @@ SELECT
     type_availability,
     weekday_name,
     interval,
-    priority_entry
+    priority_entry,
+    is_deleted
 FROM availability
 WHERE id_availability = ? LIMIT 1
 `
@@ -237,8 +339,79 @@ func (q *Queries) ListAvailability(ctx context.Context, idAvailability int64) (A
 		&i.WeekdayName,
 		&i.Interval,
 		&i.PriorityEntry,
+		&i.IsDeleted,
 	)
 	return i, err
+}
+
+const listAvailabilityByProfessionalId = `-- name: ListAvailabilityByProfessionalId :many
+SELECT
+  id_availability,
+  init_datetime,
+  end_datetime,
+  init_hour,
+  end_hour,
+  type_availability,
+  weekday_name,
+  interval,
+  priority_entry,
+  is_deleted
+FROM availability
+WHERE 1=1
+  AND id_professional == ?1
+  AND CASE WHEN ?2 == 1 THEN 1 ELSE is_deleted == 0 END
+`
+
+type ListAvailabilityByProfessionalIdParams struct {
+	IDProfessional int64       `json:"id_professional"`
+	Deleted        interface{} `json:"deleted"`
+}
+
+type ListAvailabilityByProfessionalIdRow struct {
+	IDAvailability   int64  `json:"id_availability"`
+	InitDatetime     string `json:"init_datetime"`
+	EndDatetime      string `json:"end_datetime"`
+	InitHour         string `json:"init_hour"`
+	EndHour          string `json:"end_hour"`
+	TypeAvailability int64  `json:"type_availability"`
+	WeekdayName      string `json:"weekday_name"`
+	Interval         int64  `json:"interval"`
+	PriorityEntry    int64  `json:"priority_entry"`
+	IsDeleted        int64  `json:"is_deleted"`
+}
+
+func (q *Queries) ListAvailabilityByProfessionalId(ctx context.Context, arg ListAvailabilityByProfessionalIdParams) ([]ListAvailabilityByProfessionalIdRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAvailabilityByProfessionalId, arg.IDProfessional, arg.Deleted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAvailabilityByProfessionalIdRow
+	for rows.Next() {
+		var i ListAvailabilityByProfessionalIdRow
+		if err := rows.Scan(
+			&i.IDAvailability,
+			&i.InitDatetime,
+			&i.EndDatetime,
+			&i.InitHour,
+			&i.EndHour,
+			&i.TypeAvailability,
+			&i.WeekdayName,
+			&i.Interval,
+			&i.PriorityEntry,
+			&i.IsDeleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSlots = `-- name: ListSlots :many
@@ -253,6 +426,7 @@ SELECT
   status_entry
 FROM slot
 WHERE 1=1
+  AND is_deleted = 0
   AND datetime(slot) between datetime(?1) and datetime(?2)
   AND CASE WHEN ?3 == true THEN id_professional == ?4 ELSE 1 END
 `
@@ -302,6 +476,38 @@ func (q *Queries) ListSlots(ctx context.Context, arg ListSlotsParams) ([]ListSlo
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSlotsByIdAvailability = `-- name: ListSlotsByIdAvailability :many
+SELECT
+  id_slot
+FROM slot
+WHERE 1=1
+  AND is_deleted = 0
+  AND id_availability == ?1
+`
+
+func (q *Queries) ListSlotsByIdAvailability(ctx context.Context, idAvailability int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listSlotsByIdAvailability, idAvailability)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id_slot int64
+		if err := rows.Scan(&id_slot); err != nil {
+			return nil, err
+		}
+		items = append(items, id_slot)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
