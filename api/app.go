@@ -42,9 +42,17 @@ func SetupAndRunApp() error {
 		log.Fatal(errSchema)
 	}
 
+	initialize_script_db := `
+  drop table if exists blocker;
+  drop table if exists slot; 
+  drop table if exists availability; 
+  drop table if exists professional; 
+  drop table if exists attribute; 
+  pragma foreign_keys = on;`
+
 	ctx := context.Background()
 	// create tables
-	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("drop table if exists slot; drop table if exists availability; drop table if exists professional; drop table if exists attribute; %s", ddl)); err != nil {
+	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("%s; %s", initialize_script_db, ddl)); err != nil {
 		log.Fatal(err)
 	}
 

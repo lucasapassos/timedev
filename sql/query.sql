@@ -95,27 +95,44 @@ INSERT INTO slot (
     interval,
     priority_entry,
     status_entry,
-    is_deleted
+    is_deleted,
+    id_blocker
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, 'Aberto', 0
+  @id_professional,
+  @id_availability,
+  @slot,
+  @weekday_name,
+  @interval,
+  @priority_entry,
+  @status_entry,
+  @is_deleted,
+  @id_blocker
 )
 RETURNING *;
 
 -- name: ListSlots :many
 SELECT
-  id_slot,
-  id_professional,
-  id_availability,
-  slot,
-  weekday_name,
-  interval,
-  priority_entry,
-  status_entry
-FROM slot
+  s.id_slot,
+  s.id_professional,
+  s.id_availability,
+  s.slot,
+  p.especialidade,
+  s.weekday_name,
+  s.interval,
+  s.priority_entry,
+  s.status_entry,
+  s.id_blocker
+FROM slot s
+LEFT JOIN professional p on s.id_professional = p.id_professional
 WHERE 1=1
-  AND is_deleted = 0
+  AND s.is_deleted = 0
   AND datetime(slot) between datetime(@slot_init) and datetime(@slot_end)
-  AND CASE WHEN @is_professional == true THEN id_professional == @id_professional ELSE 1 END;
+  AND CASE WHEN @is_professional == true THEN s.id_professional == @id_professional ELSE 1 END
+  AND CASE WHEN @is_open == true THEN s.status_entry == 'open' ELSE 1 END
+  AND CASE WHEN @is_especialidade == true THEN p.especialidade in (sqlc.slice('especialidade')) ELSE 1 END
+  AND CASE WHEN @is_idclinica == true THEN s.id_professional in (
+    SELECT a.id_professional FROM attribute a WHERE attribute == 'idclinica' and value in (sqlc.slice('idclinica'))
+  ) ELSE 1 END;
 
 -- name: ListSlotsByIdAvailability :many
 SELECT
@@ -168,3 +185,77 @@ FROM availability
 WHERE 1=1
   AND id_professional == @id_professional
   AND CASE WHEN @deleted == true THEN 1 ELSE is_deleted == 0 END;
+
+-- name: GetSlotById :one
+SELECT
+  id_slot,
+  id_professional,
+  id_availability,
+  slot,
+  weekday_name,
+  interval,
+  priority_entry,
+  status_entry,
+  is_deleted
+FROM slot
+WHERE 1=1
+  AND id_slot == @id_slot
+  AND CASE WHEN @deleted == true THEN 1 ELSE is_deleted == 0 END;
+
+-- name: ListBlockerByProfessional :many
+SELECT
+  id_blocker,
+  id_professional,
+  title,
+  description,
+  init_datetime,
+  end_datetime,
+  is_deleted
+FROM blocker
+WHERE 1=1
+  AND id_professional == @id_professional
+  AND CASE WHEN @deleted == true THEN 1 ELSE is_deleted ==0 END;
+
+-- name: InsertBlocker :one
+INSERT INTO blocker (
+  id_professional,
+  title,
+  description,
+  init_datetime,
+  end_datetime
+) VALUES (
+  @id_professional, 
+  @title, 
+  @description,
+  @init_datetime,
+  @end_datetime
+)
+RETURNING *;
+
+-- name: GetBlockerById :one
+SELECT
+  id_blocker,
+  id_professional,
+  title,
+  init_datetime,
+  end_datetime,
+  is_deleted
+FROM blocker
+WHERE 1=1
+  AND id_blocker == @id_blocker
+  AND CASE WHEN @deleted == true THEN 1 ELSE is_deleted == 0 END;
+
+-- name: DeleteBlockerById :one
+UPDATE blocker
+SET is_deleted = 1
+WHERE id_blocker == @id_blocker
+RETURNING *;
+
+-- name: UpdateSlotSetBlocker :many
+UPDATE slot
+SET status_entry = @status_entry,
+	  id_blocker = @id_blocker
+WHERE 1=1
+	AND id_professional = @id_professional
+  AND slot >= @init_blocker AND slot <= @end_blocker
+RETURNING *;

@@ -5,6 +5,7 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -16,17 +17,27 @@ type Attribute struct {
 }
 
 type Availability struct {
-	IDAvailability   int64  `json:"id_availability"`
-	IDProfessional   int64  `json:"id_professional"`
-	InitDatetime     string `json:"init_datetime"`
-	EndDatetime      string `json:"end_datetime"`
-	InitHour         string `json:"init_hour"`
-	EndHour          string `json:"end_hour"`
-	TypeAvailability int64  `json:"type_availability"`
-	WeekdayName      string `json:"weekday_name"`
-	Interval         int64  `json:"interval"`
-	PriorityEntry    int64  `json:"priority_entry"`
-	IsDeleted        int64  `json:"is_deleted"`
+	IDAvailability   int64     `json:"id_availability"`
+	IDProfessional   int64     `json:"id_professional"`
+	InitDatetime     time.Time `json:"init_datetime"`
+	EndDatetime      time.Time `json:"end_datetime"`
+	InitHour         string    `json:"init_hour"`
+	EndHour          string    `json:"end_hour"`
+	TypeAvailability int64     `json:"type_availability"`
+	WeekdayName      string    `json:"weekday_name"`
+	Interval         int64     `json:"interval"`
+	PriorityEntry    int64     `json:"priority_entry"`
+	IsDeleted        int64     `json:"is_deleted"`
+}
+
+type Blocker struct {
+	IDBlocker      int64          `json:"id_blocker"`
+	Title          string         `json:"title"`
+	Description    sql.NullString `json:"description"`
+	IDProfessional int64          `json:"id_professional"`
+	InitDatetime   time.Time      `json:"init_datetime"`
+	EndDatetime    time.Time      `json:"end_datetime"`
+	IsDeleted      int64          `json:"is_deleted"`
 }
 
 type Professional struct {
@@ -36,13 +47,14 @@ type Professional struct {
 }
 
 type Slot struct {
-	IDSlot         int64     `json:"id_slot"`
-	IDAvailability int64     `json:"id_availability"`
-	IDProfessional int64     `json:"id_professional"`
-	Slot           time.Time `json:"slot"`
-	WeekdayName    string    `json:"weekday_name"`
-	Interval       int64     `json:"interval"`
-	PriorityEntry  int64     `json:"priority_entry"`
-	StatusEntry    string    `json:"status_entry"`
-	IsDeleted      int64     `json:"is_deleted"`
+	IDSlot         int64         `json:"id_slot"`
+	IDAvailability int64         `json:"id_availability"`
+	IDProfessional int64         `json:"id_professional"`
+	Slot           time.Time     `json:"slot"`
+	WeekdayName    string        `json:"weekday_name"`
+	Interval       int64         `json:"interval"`
+	PriorityEntry  int64         `json:"priority_entry"`
+	StatusEntry    string        `json:"status_entry"`
+	IsDeleted      int64         `json:"is_deleted"`
+	IDBlocker      sql.NullInt64 `json:"id_blocker"`
 }

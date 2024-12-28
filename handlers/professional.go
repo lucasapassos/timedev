@@ -51,7 +51,14 @@ func HandleGetProfessional(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"professional": professionalValue, "attributes": attributeValue, "availability": availabilityValue})
+	blockerValue, err := queries.ListBlockerByProfessional(ctx, models.ListBlockerByProfessionalParams{
+		IDProfessional: professionalId,
+	})
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"professional": professionalValue, "attributes": attributeValue, "availability": availabilityValue, "blocker": blockerValue})
 }
 
 func HandleCreateProfessional(c echo.Context) error {
@@ -85,6 +92,12 @@ func HandleCreateAttribute(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
+	IdProfessionalStr := c.Param("idprofessional")
+	idProfessional, err := strconv.ParseInt(IdProfessionalStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err)
+	}
+
 	var attributeUnit models.Attribute
 
 	// Bind the incoming JSON data to the userInput struct
@@ -94,13 +107,33 @@ func HandleCreateAttribute(c echo.Context) error {
 	}
 
 	queries := models.New(db)
-	insertedAttribute, err := queries.InsertAttribute(ctx, models.InsertAttributeParams{
-		IDProfessional: attributeUnit.IDProfessional,
+	tx, err := db.Begin()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to initialize a transaction"})
+	}
+	defer tx.Rollback()
+
+	qtx := queries.WithTx(tx)
+
+	professionalUnit, err := qtx.GetProfessionalInfo(ctx, idProfessional)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
+		}
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	insertedAttribute, err := qtx.InsertAttribute(ctx, models.InsertAttributeParams{
+		IDProfessional: idProfessional,
 		Attribute:      attributeUnit.Attribute,
 		Value:          attributeUnit.Value,
 	})
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to insert Attribute"})
+		tx.Rollback()
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to insert Attribute", "description": err.Error()})
 	}
-	return c.JSON(http.StatusOK, insertedAttribute)
+
+	tx.Commit()
+
+	return c.JSON(http.StatusOK, echo.Map{"user": professionalUnit, "attributes": insertedAttribute})
 }

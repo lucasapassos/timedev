@@ -10,19 +10,26 @@ import (
 func SetupRoutes(app *echo.Echo) {
 	api := app.Group("/api")
 
-	// availability
-	api.DELETE("/availability/:idavailability", handlers.HandleDeleteAvailability)
-	api.POST("/availability", handlers.HandleCreateAvailability)
-	api.GET("/availability/:id", handlers.HandleGetAvailability)
-
 	// slots
 	api.GET("/slot", handlers.HandleListSlots)
+	api.GET("/slot/:idslot", handlers.HandleGetSlot)
 
 	// professional
 	api.GET("/professional/:idprofessional", handlers.HandleGetProfessional)
 	api.POST("/professional", handlers.HandleCreateProfessional)
-	api.POST("/professional/attributes", handlers.HandleCreateAttribute)
-	// // Group that requires authentication
+	api.POST("/professional/:idprofessional/attributes", handlers.HandleCreateAttribute)
+
+	// availability
+	api.DELETE("/professional/:idprofessional/availability/:idavailability", handlers.HandleDeleteAvailability)
+	api.POST("/professional/:idprofessional/availability", handlers.HandleCreateAvailability)
+	api.GET("/professional/:idprofessional/availability", handlers.HandleListAvailability)
+	api.GET("/professional/:idprofessional/availability/:id", handlers.HandleGetAvailability)
+
+	// blockers
+	api.POST("/professional/:idprofessional/blocker", handlers.HandleCreateBlocker)
+	api.GET("/professional/:idprofessional/blocker", handlers.HandleListBlocker)
+	api.DELETE("/professional/:idprofessional/blocker/:idblocker", handlers.HandleDeleteBlocker)
+	// Group that requires authentication
 	// api := app.Group("/api")
 	// api.Use(middleware.KeycloakJWTMiddleware)
 	// api.GET("/auth-check", handlers.HandleAuthCheck)

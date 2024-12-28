@@ -1,11 +1,10 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
-
-	"errors"
 )
 
 func computeWeekdayName(weekday string) (time.Weekday, error) {
@@ -30,20 +29,15 @@ func computeWeekdayName(weekday string) (time.Weekday, error) {
 	}
 
 	return weekdayName, nil
-
 }
 
-func ComputeSlots(startDatetime, endDatetime string, weekday string, intervalDuration, typeavailability int, hour_init, hour_end string) ([]time.Time, error) {
-	layout := "2006-01-02 15:04:05"
-	start, _ := time.Parse(layout, startDatetime)
-	end, _ := time.Parse(layout, endDatetime)
-
+func ComputeSlots(startDatetime, endDatetime time.Time, weekday string, intervalDuration, typeavailability int, hour_init, hour_end string) ([]time.Time, error) {
 	weekdayName, err := computeWeekdayName(weekday)
 	if err != nil {
 		return nil, err
 	}
 
-	weekDayValids := CalculateWeekdayBetween(start, end, weekdayName, typeavailability)
+	weekDayValids := CalculateWeekdayBetween(startDatetime, endDatetime, weekdayName, typeavailability)
 
 	slots, err := ComputeAgenda(hour_init, hour_end, weekDayValids, time.Duration(intervalDuration)*time.Minute)
 	if err != nil {
@@ -120,6 +114,8 @@ func SplitTimeRange(hourStart, hourEnd time.Time, interval time.Duration) []time
 	if hourStart.After(hourEnd) {
 		return nil
 	}
+
+	// TODO Add to function the power to use inconsecutives slots (like, 45 (atd) + 15 (break) = 1h) or for every 2 sessions, skip the third.
 
 	var slots []time.Time
 	current := hourStart
