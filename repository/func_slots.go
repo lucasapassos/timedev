@@ -154,7 +154,7 @@ func ComputeAgenda(initialHour, endHour string, daysToCompute []time.Time, durat
 			startTime.Minute(),
 			startTime.Second(),
 			startTime.Nanosecond(),
-			startTime.Location(),
+			dayCompute.Location(),
 		)
 
 		tempEndDayTime := time.Date(
@@ -165,7 +165,7 @@ func ComputeAgenda(initialHour, endHour string, daysToCompute []time.Time, durat
 			endTime.Minute(),
 			endTime.Second(),
 			endTime.Nanosecond(),
-			endTime.Location(),
+			dayCompute.Location(),
 		)
 
 		slots := SplitTimeRange(tempStartDayTime, tempEndDayTime, duration)

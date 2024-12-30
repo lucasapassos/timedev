@@ -11,6 +11,7 @@ func SetupRoutes(app *echo.Echo) {
 	api := app.Group("/api")
 
 	// slots
+	api.POST("/professional/:idprofessional/slot", handlers.HandleCreateSlot)
 	api.GET("/slot", handlers.HandleListSlots)
 	api.GET("/slot/:idslot", handlers.HandleGetSlot)
 

@@ -48,7 +48,7 @@ type Professional struct {
 
 type Slot struct {
 	IDSlot         int64         `json:"id_slot"`
-	IDAvailability int64         `json:"id_availability"`
+	IDAvailability sql.NullInt64 `json:"id_availability"`
 	IDProfessional int64         `json:"id_professional"`
 	Slot           time.Time     `json:"slot"`
 	WeekdayName    string        `json:"weekday_name"`

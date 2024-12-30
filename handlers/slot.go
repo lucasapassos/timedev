@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,70 @@ import (
 
 	"github.com/labstack/echo/v4"
 )
+
+func HandleCreateSlot(e echo.Context) error {
+	ctx := context.Background()
+	db := db.OpenDBConnection()
+	defer db.Close()
+
+	type receivedDataStruct struct {
+		IDProfessional int64         `param:"idprofessional"`
+		IDAvailability sql.NullInt64 `json:"idavailability"`
+		Slot           time.Time     `json:"slot"`
+		WeekdayName    time.Weekday  `json:"weekday_name"`
+		Interval       int64         `json:"interval"`
+		PriorityEntry  int64         `json:"priority_entry"`
+		StatusEntry    string        `json:"status_entry"`
+	}
+
+	var receivedData receivedDataStruct
+	if err := e.Bind(&receivedData); err != nil {
+		return e.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to begin transaction", "description": err.Error()})
+	}
+	defer tx.Rollback()
+
+	queries := models.New(tx)
+
+	professionalExists, err := queries.CheckProfessionalExists(ctx, receivedData.IDProfessional)
+	if err != nil {
+		if (err == sql.ErrNoRows) && (professionalExists == 0) {
+			return e.JSON(http.StatusBadRequest, echo.Map{"error": "Professional does not exist"})
+		}
+		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to check professional existence", "description": err.Error()})
+	}
+
+	value_slot_return, err := queries.GetExistingSlot(ctx, models.GetExistingSlotParams{
+		IDProfessional: receivedData.IDProfessional,
+		Datetime:       receivedData.Slot,
+		PriorityEntry:  receivedData.PriorityEntry,
+	})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			createdSlot, err := queries.CreateSlot(ctx, models.CreateSlotParams{
+				IDProfessional: receivedData.IDProfessional,
+				IDAvailability: sql.NullInt64{Valid: false},
+				Slot:           receivedData.Slot,
+				WeekdayName:    receivedData.Slot.Weekday().String(),
+				Interval:       receivedData.Interval,
+				PriorityEntry:  receivedData.PriorityEntry,
+				StatusEntry:    receivedData.StatusEntry,
+			})
+			if err != nil {
+				return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to create slot", "description": err.Error()})
+			}
+			tx.Commit()
+			return e.JSON(http.StatusCreated, createdSlot)
+		}
+		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to get slot state", "description": err.Error()})
+	}
+
+	return e.JSON(http.StatusBadRequest, echo.Map{"error": "Slot already exists", "description": value_slot_return})
+}
 
 func HandleGetSlot(c echo.Context) error {
 	ctx := context.Background()

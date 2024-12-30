@@ -12,6 +12,76 @@ import (
 	"time"
 )
 
+const checkProfessionalExists = `-- name: CheckProfessionalExists :one
+SELECT 1
+FROM professional
+WHERE id_professional = ?1
+`
+
+func (q *Queries) CheckProfessionalExists(ctx context.Context, idProfessional int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, checkProfessionalExists, idProfessional)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const createSlot = `-- name: CreateSlot :one
+INSERT INTO slot(
+  id_professional,
+  id_availability,
+  slot,
+  weekday_name,
+  interval,
+  priority_entry,
+  status_entry
+) VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  ?5,
+  ?6,
+  ?7
+)
+RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, is_deleted, id_blocker
+`
+
+type CreateSlotParams struct {
+	IDProfessional int64         `json:"id_professional"`
+	IDAvailability sql.NullInt64 `json:"id_availability"`
+	Slot           time.Time     `json:"slot"`
+	WeekdayName    string        `json:"weekday_name"`
+	Interval       int64         `json:"interval"`
+	PriorityEntry  int64         `json:"priority_entry"`
+	StatusEntry    string        `json:"status_entry"`
+}
+
+func (q *Queries) CreateSlot(ctx context.Context, arg CreateSlotParams) (Slot, error) {
+	row := q.db.QueryRowContext(ctx, createSlot,
+		arg.IDProfessional,
+		arg.IDAvailability,
+		arg.Slot,
+		arg.WeekdayName,
+		arg.Interval,
+		arg.PriorityEntry,
+		arg.StatusEntry,
+	)
+	var i Slot
+	err := row.Scan(
+		&i.IDSlot,
+		&i.IDAvailability,
+		&i.IDProfessional,
+		&i.Slot,
+		&i.WeekdayName,
+		&i.Interval,
+		&i.PriorityEntry,
+		&i.StatusEntry,
+		&i.IsDeleted,
+		&i.IDBlocker,
+	)
+	return i, err
+}
+
 const deleteAvailabilityById = `-- name: DeleteAvailabilityById :one
 UPDATE availability
 SET is_deleted = 1
@@ -114,7 +184,7 @@ func (q *Queries) GetBlockerById(ctx context.Context, arg GetBlockerByIdParams) 
 }
 
 const getExistingSlot = `-- name: GetExistingSlot :one
-SELECT 1
+SELECT id_slot
 FROM slot s
 WHERE 1=1
   AND is_deleted = 0
@@ -131,9 +201,9 @@ type GetExistingSlotParams struct {
 
 func (q *Queries) GetExistingSlot(ctx context.Context, arg GetExistingSlotParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getExistingSlot, arg.IDProfessional, arg.Datetime, arg.PriorityEntry)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var id_slot int64
+	err := row.Scan(&id_slot)
+	return id_slot, err
 }
 
 const getProfessionalInfo = `-- name: GetProfessionalInfo :one
@@ -181,15 +251,15 @@ type GetSlotByIdParams struct {
 }
 
 type GetSlotByIdRow struct {
-	IDSlot         int64     `json:"id_slot"`
-	IDProfessional int64     `json:"id_professional"`
-	IDAvailability int64     `json:"id_availability"`
-	Slot           time.Time `json:"slot"`
-	WeekdayName    string    `json:"weekday_name"`
-	Interval       int64     `json:"interval"`
-	PriorityEntry  int64     `json:"priority_entry"`
-	StatusEntry    string    `json:"status_entry"`
-	IsDeleted      int64     `json:"is_deleted"`
+	IDSlot         int64         `json:"id_slot"`
+	IDProfessional int64         `json:"id_professional"`
+	IDAvailability sql.NullInt64 `json:"id_availability"`
+	Slot           time.Time     `json:"slot"`
+	WeekdayName    string        `json:"weekday_name"`
+	Interval       int64         `json:"interval"`
+	PriorityEntry  int64         `json:"priority_entry"`
+	StatusEntry    string        `json:"status_entry"`
+	IsDeleted      int64         `json:"is_deleted"`
 }
 
 func (q *Queries) GetSlotById(ctx context.Context, arg GetSlotByIdParams) (GetSlotByIdRow, error) {
@@ -396,7 +466,7 @@ func (q *Queries) InsertProfessional(ctx context.Context, arg InsertProfessional
 	return i, err
 }
 
-const insertSlot = `-- name: InsertSlot :exec
+const insertSlot = `-- name: InsertSlot :one
 INSERT INTO slot (
     id_professional,
     id_availability,
@@ -418,12 +488,12 @@ INSERT INTO slot (
   ?8,
   ?9
 )
-RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, is_deleted, id_blocker
+RETURNING slot
 `
 
 type InsertSlotParams struct {
 	IDProfessional int64         `json:"id_professional"`
-	IDAvailability int64         `json:"id_availability"`
+	IDAvailability sql.NullInt64 `json:"id_availability"`
 	Slot           time.Time     `json:"slot"`
 	WeekdayName    string        `json:"weekday_name"`
 	Interval       int64         `json:"interval"`
@@ -433,8 +503,8 @@ type InsertSlotParams struct {
 	IDBlocker      sql.NullInt64 `json:"id_blocker"`
 }
 
-func (q *Queries) InsertSlot(ctx context.Context, arg InsertSlotParams) error {
-	_, err := q.db.ExecContext(ctx, insertSlot,
+func (q *Queries) InsertSlot(ctx context.Context, arg InsertSlotParams) (time.Time, error) {
+	row := q.db.QueryRowContext(ctx, insertSlot,
 		arg.IDProfessional,
 		arg.IDAvailability,
 		arg.Slot,
@@ -445,7 +515,9 @@ func (q *Queries) InsertSlot(ctx context.Context, arg InsertSlotParams) error {
 		arg.IsDeleted,
 		arg.IDBlocker,
 	)
-	return err
+	var slot time.Time
+	err := row.Scan(&slot)
+	return slot, err
 }
 
 const listAttributesByProfessionalId = `-- name: ListAttributesByProfessionalId :many
@@ -676,6 +748,7 @@ WHERE 1=1
   AND CASE WHEN ?8 == true THEN s.id_professional in (
     SELECT a.id_professional FROM attribute a WHERE attribute == 'idclinica' and value in (/*SLICE:idclinica*/?)
   ) ELSE 1 END
+ORDER BY s.slot
 `
 
 type ListSlotsParams struct {
@@ -693,7 +766,7 @@ type ListSlotsParams struct {
 type ListSlotsRow struct {
 	IDSlot         int64          `json:"id_slot"`
 	IDProfessional int64          `json:"id_professional"`
-	IDAvailability int64          `json:"id_availability"`
+	IDAvailability sql.NullInt64  `json:"id_availability"`
 	Slot           time.Time      `json:"slot"`
 	Especialidade  sql.NullString `json:"especialidade"`
 	WeekdayName    string         `json:"weekday_name"`
@@ -771,7 +844,7 @@ WHERE 1=1
   AND id_availability == ?1
 `
 
-func (q *Queries) ListSlotsByIdAvailability(ctx context.Context, idAvailability int64) ([]int64, error) {
+func (q *Queries) ListSlotsByIdAvailability(ctx context.Context, idAvailability sql.NullInt64) ([]int64, error) {
 	rows, err := q.db.QueryContext(ctx, listSlotsByIdAvailability, idAvailability)
 	if err != nil {
 		return nil, err

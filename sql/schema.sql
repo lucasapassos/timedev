@@ -15,7 +15,7 @@ create table availability (
 
 create table slot (
     id_slot INTEGER PRIMARY KEY,
-    id_availability INTEGER NOT NULL,
+    id_availability INTEGER,
     id_professional INTEGER NOT NULL,
     slot DATETIME NOT NULL,
     weekday_name TEXT NOT NULL,

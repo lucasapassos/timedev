@@ -47,10 +47,6 @@ func HandleListAvailability(c echo.Context) error {
 	return c.JSON(http.StatusOK, availabilityValue)
 }
 
-type AvailabilityUnit struct {
-	idavailability int64 `param:"idavailability"`
-}
-
 func HandleDeleteAvailability(c echo.Context) error {
 	ctx := context.Background()
 
@@ -88,7 +84,7 @@ func HandleDeleteAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, availabilityId)
+	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{availabilityId, true})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to load slots from availability", "description": err.Error()})
 	}
@@ -210,12 +206,12 @@ func HandleCreateAvailability(c echo.Context) error {
 	var slot_non_added []string
 	for _, slot := range slots {
 
-		value_slot_return, err := qtx.GetExistingSlot(ctx, models.GetExistingSlotParams{
+		slotId, err := qtx.GetExistingSlot(ctx, models.GetExistingSlotParams{
 			IDProfessional: professionalId,
-			Datetime:       slot.Format("2006-01-02 15:04:05+00:00"),
+			Datetime:       slot,
 			PriorityEntry:  insertedAvailability.PriorityEntry,
 		})
-		if value_slot_return == 0 {
+		if (err != nil) && (err == sql.ErrNoRows) {
 
 			type statusAndIdBlockerStruct struct {
 				idBlocker   sql.NullInt64
@@ -225,18 +221,16 @@ func HandleCreateAvailability(c echo.Context) error {
 			statusAndBlocker.statusEntry = "open"
 			statusAndBlocker.idBlocker = sql.NullInt64{Valid: false}
 
-			if listBlockers != nil {
-				for _, blockUnit := range listBlockers {
-					if (blockUnit.InitDatetime.Before(slot)) && (blockUnit.EndDatetime.After(slot)) {
-						statusAndBlocker.idBlocker = sql.NullInt64{Int64: blockUnit.IDBlocker, Valid: true}
-						statusAndBlocker.statusEntry = "block"
-					}
+			for _, blockUnit := range listBlockers {
+				if (blockUnit.InitDatetime.Before(slot)) && (blockUnit.EndDatetime.After(slot)) {
+					statusAndBlocker.idBlocker = sql.NullInt64{Int64: blockUnit.IDBlocker, Valid: true}
+					statusAndBlocker.statusEntry = "block"
 				}
 			}
 
-			err_insert := qtx.InsertSlot(ctx, models.InsertSlotParams{
+			insertedSlot, err := qtx.InsertSlot(ctx, models.InsertSlotParams{
 				IDProfessional: professionalId,
-				IDAvailability: insertedAvailability.IDAvailability,
+				IDAvailability: sql.NullInt64{insertedAvailability.IDAvailability, true},
 				Slot:           slot,
 				WeekdayName:    insertedAvailability.WeekdayName,
 				Interval:       insertedAvailability.Interval,
@@ -245,16 +239,16 @@ func HandleCreateAvailability(c echo.Context) error {
 				StatusEntry:    statusAndBlocker.statusEntry,
 				IDBlocker:      statusAndBlocker.idBlocker,
 			})
-			if err_insert != nil {
+			if err != nil {
 				slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to insert."))
 			}
 
-			slots_added = append(slots_added, slot)
+			slots_added = append(slots_added, insertedSlot)
 
-		} else if err != nil {
-			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to get state."))
+		} else if (err != nil) && (err != sql.ErrNoRows) {
+			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to get state of slot."))
 		} else {
-			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Trying to insert in a busy slot."))
+			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Trying to insert in a busy slot.", slotId))
 		}
 	}
 

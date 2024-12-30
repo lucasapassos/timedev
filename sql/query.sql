@@ -78,7 +78,7 @@ FROM availability
 WHERE id_availability = ? LIMIT 1;
 
 -- name: GetExistingSlot :one
-SELECT 1
+SELECT id_slot
 FROM slot s
 WHERE 1=1
   AND is_deleted = 0
@@ -86,7 +86,7 @@ WHERE 1=1
 	AND datetime(?) between datetime(slot) and datetime(slot, concat(s."interval" - 1, ' minute'))
     AND priority_entry = ?;
 
--- name: InsertSlot :exec
+-- name: InsertSlot :one
 INSERT INTO slot (
     id_professional,
     id_availability,
@@ -108,7 +108,7 @@ INSERT INTO slot (
   @is_deleted,
   @id_blocker
 )
-RETURNING *;
+RETURNING slot;
 
 -- name: ListSlots :many
 SELECT
@@ -132,7 +132,8 @@ WHERE 1=1
   AND CASE WHEN @is_especialidade == true THEN p.especialidade in (sqlc.slice('especialidade')) ELSE 1 END
   AND CASE WHEN @is_idclinica == true THEN s.id_professional in (
     SELECT a.id_professional FROM attribute a WHERE attribute == 'idclinica' and value in (sqlc.slice('idclinica'))
-  ) ELSE 1 END;
+  ) ELSE 1 END
+ORDER BY s.slot;
 
 -- name: ListSlotsByIdAvailability :many
 SELECT
@@ -259,3 +260,28 @@ WHERE 1=1
 	AND id_professional = @id_professional
   AND slot >= @init_blocker AND slot <= @end_blocker
 RETURNING *;
+
+-- name: CreateSlot :one
+INSERT INTO slot(
+  id_professional,
+  id_availability,
+  slot,
+  weekday_name,
+  interval,
+  priority_entry,
+  status_entry
+) VALUES (
+  @id_professional,
+  @id_availability,
+  @slot,
+  @weekday_name,
+  @interval,
+  @priority_entry,
+  @status_entry
+)
+RETURNING *;
+
+-- name: CheckProfessionalExists :one
+SELECT 1
+FROM professional
+WHERE id_professional = @id_professional;
