@@ -209,22 +209,29 @@ func (q *Queries) GetExistingSlot(ctx context.Context, arg GetExistingSlotParams
 const getProfessionalInfo = `-- name: GetProfessionalInfo :one
 SELECT
   id_professional,
+  reference_key,
   nome,
   especialidade
 FROM professional
-WHERE id_professional == ?1
+WHERE reference_key == ?1
 `
 
 type GetProfessionalInfoRow struct {
 	IDProfessional int64  `json:"id_professional"`
+	ReferenceKey   string `json:"reference_key"`
 	Nome           string `json:"nome"`
 	Especialidade  string `json:"especialidade"`
 }
 
-func (q *Queries) GetProfessionalInfo(ctx context.Context, idProfessional int64) (GetProfessionalInfoRow, error) {
-	row := q.db.QueryRowContext(ctx, getProfessionalInfo, idProfessional)
+func (q *Queries) GetProfessionalInfo(ctx context.Context, referenceKey string) (GetProfessionalInfoRow, error) {
+	row := q.db.QueryRowContext(ctx, getProfessionalInfo, referenceKey)
 	var i GetProfessionalInfoRow
-	err := row.Scan(&i.IDProfessional, &i.Nome, &i.Especialidade)
+	err := row.Scan(
+		&i.IDProfessional,
+		&i.ReferenceKey,
+		&i.Nome,
+		&i.Especialidade,
+	)
 	return i, err
 }
 
@@ -421,15 +428,17 @@ const insertProfessional = `-- name: InsertProfessional :one
 
 
 INSERT INTO professional (
+  reference_key,
   nome,
   especialidade
 ) VALUES (
-  ?, ?
+  ?, ?, ?
 )
-RETURNING id_professional, especialidade, nome
+RETURNING id_professional, reference_key, especialidade, nome
 `
 
 type InsertProfessionalParams struct {
+	ReferenceKey  string `json:"reference_key"`
 	Nome          string `json:"nome"`
 	Especialidade string `json:"especialidade"`
 }
@@ -460,9 +469,14 @@ type InsertProfessionalParams struct {
 // DELETE FROM authors
 // WHERE id = ?;
 func (q *Queries) InsertProfessional(ctx context.Context, arg InsertProfessionalParams) (Professional, error) {
-	row := q.db.QueryRowContext(ctx, insertProfessional, arg.Nome, arg.Especialidade)
+	row := q.db.QueryRowContext(ctx, insertProfessional, arg.ReferenceKey, arg.Nome, arg.Especialidade)
 	var i Professional
-	err := row.Scan(&i.IDProfessional, &i.Especialidade, &i.Nome)
+	err := row.Scan(
+		&i.IDProfessional,
+		&i.ReferenceKey,
+		&i.Especialidade,
+		&i.Nome,
+	)
 	return i, err
 }
 

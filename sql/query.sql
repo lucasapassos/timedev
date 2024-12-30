@@ -26,10 +26,11 @@
 
 -- name: InsertProfessional :one
 INSERT INTO professional (
+  reference_key,
   nome,
   especialidade
 ) VALUES (
-  ?, ?
+  ?, ?, ?
 )
 RETURNING *;
 
@@ -157,10 +158,11 @@ RETURNING *;
 -- name: GetProfessionalInfo :one
 SELECT
   id_professional,
+  reference_key,
   nome,
   especialidade
 FROM professional
-WHERE id_professional == @id_professional;
+WHERE reference_key == @reference_key;
 
 -- name: ListAttributesByProfessionalId :many
 SELECT

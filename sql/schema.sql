@@ -42,6 +42,7 @@ create table blocker (
 
 create table professional (
   id_professional INTEGER PRIMARY KEY,
+  reference_key TEXT NOT NULL UNIQUE,
   especialidade TEXT NOT NULL,
   nome TEXT NOT NULL
 );

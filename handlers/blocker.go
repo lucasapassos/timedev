@@ -18,8 +18,8 @@ func HandleListBlocker(c echo.Context) error {
 	defer db.Close()
 
 	type urlParams struct {
-		IdProfessional int64 `param:"idprofessional"`
-		Deleted        bool  `query:"deleted"`
+		ReferenceKey string `param:"referencekey"`
+		Deleted      bool   `query:"deleted"`
 	}
 
 	var params urlParams
@@ -28,7 +28,7 @@ func HandleListBlocker(c echo.Context) error {
 	}
 
 	queries := models.New(db)
-	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.IdProfessional)
+	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
@@ -37,7 +37,7 @@ func HandleListBlocker(c echo.Context) error {
 	}
 
 	blockerList, err := queries.ListBlockerByProfessional(ctx, models.ListBlockerByProfessionalParams{
-		IDProfessional: params.IdProfessional,
+		IDProfessional: professionalUnit.IDProfessional,
 		Deleted:        params.Deleted,
 	})
 	if err != nil {
@@ -56,11 +56,11 @@ func HandleCreateBlocker(c echo.Context) error {
 	defer db.Close()
 
 	type urlParams struct {
-		IDProfessional int64     `param:"idprofessional"`
-		Title          string    `json:"title"`
-		Description    string    `json:"description"`
-		Init           time.Time `json:"init"`
-		End            time.Time `json:"end"`
+		ReferenceKey string    `param:"referencekey"`
+		Title        string    `json:"title"`
+		Description  string    `json:"description"`
+		Init         time.Time `json:"init"`
+		End          time.Time `json:"end"`
 	}
 	var params urlParams
 	// Bind the incoming JSON data to the userInput struct
@@ -78,7 +78,7 @@ func HandleCreateBlocker(c echo.Context) error {
 
 	qtx := queries.WithTx(tx)
 
-	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.IDProfessional)
+	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		tx.Rollback()
 		if err == sql.ErrNoRows {
@@ -88,7 +88,7 @@ func HandleCreateBlocker(c echo.Context) error {
 	}
 
 	blockUnit, err := qtx.InsertBlocker(ctx, models.InsertBlockerParams{
-		IDProfessional: params.IDProfessional,
+		IDProfessional: professionalUnit.IDProfessional,
 		Title:          params.Title,
 		Description:    sql.NullString{String: params.Description, Valid: true},
 		InitDatetime:   params.Init,
@@ -101,7 +101,7 @@ func HandleCreateBlocker(c echo.Context) error {
 	fmt.Printf("blockUnit.IDBlocker: %v\n", blockUnit.IDBlocker)
 
 	slotBlocked, err := qtx.UpdateSlotSetBlocker(ctx, models.UpdateSlotSetBlockerParams{
-		IDProfessional: params.IDProfessional,
+		IDProfessional: professionalUnit.IDProfessional,
 		StatusEntry:    "block",
 		IDBlocker:      sql.NullInt64{Int64: blockUnit.IDBlocker, Valid: true},
 		InitBlocker:    params.Init,
@@ -122,8 +122,8 @@ func HandleDeleteBlocker(c echo.Context) error {
 	defer db.Close()
 
 	type UrlParams struct {
-		IdProfessional int64 `param:"idprofessional"`
-		IdBlocker      int64 `param:"idblocker"`
+		ReferenceKey string `param:"referencekey"`
+		IdBlocker    int64  `param:"idblocker"`
 	}
 
 	var params UrlParams
@@ -143,7 +143,7 @@ func HandleDeleteBlocker(c echo.Context) error {
 
 	qtx := queries.WithTx(tx)
 
-	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.IdProfessional)
+	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		tx.Rollback()
 		if err == sql.ErrNoRows {
@@ -162,7 +162,7 @@ func HandleDeleteBlocker(c echo.Context) error {
 	}
 
 	slotChanged, err := qtx.UpdateSlotSetBlocker(ctx, models.UpdateSlotSetBlockerParams{
-		IDProfessional: params.IdProfessional,
+		IDProfessional: professionalUnit.IDProfessional,
 		StatusEntry:    "open",
 		InitBlocker:    blockerDeleted.InitDatetime,
 		EndBlocker:     blockerDeleted.EndDatetime,

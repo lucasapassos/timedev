@@ -42,6 +42,7 @@ type Blocker struct {
 
 type Professional struct {
 	IDProfessional int64  `json:"id_professional"`
+	ReferenceKey   string `json:"reference_key"`
 	Especialidade  string `json:"especialidade"`
 	Nome           string `json:"nome"`
 }

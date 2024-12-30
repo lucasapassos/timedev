@@ -20,22 +20,30 @@ func HandleListAvailability(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	professionalIdStr := c.Param("idprofessional")
-	professionalId, err := strconv.ParseInt(professionalIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert professional id as int"})
+	type urlParam struct {
+		ReferenceKey string `param:"referencekey"`
+		Deleted      bool   `query:"deleted"`
+	}
+
+	var params urlParam
+	if err := c.Bind(&params); err != nil {
+		log.Error().Err(err).Msg("Failed to bind request data")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
 	queries := models.New(db)
 
-	query_deleted := c.QueryParam("deleted")
-	var is_delete bool
-	if query_deleted == "1" {
-		is_delete = true
+	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
+		}
+		return c.JSON(http.StatusBadRequest, err)
 	}
+
 	availabilityValue, err := queries.ListAvailabilityByProfessionalId(ctx, models.ListAvailabilityByProfessionalIdParams{
-		IDProfessional: professionalId,
-		Deleted:        is_delete,
+		IDProfessional: professionalUnit.IDProfessional,
+		Deleted:        params.Deleted,
 	})
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -53,10 +61,16 @@ func HandleDeleteAvailability(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	availabilityIdStr := c.Param("idavailability")
-	availabilityId, err := strconv.ParseInt(availabilityIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for id availability."})
+	type urlParam struct {
+		ReferenceKey   string `param:"referencekey"`
+		Deleted        bool   `query:"deleted"`
+		IDAvailability int64  `param:"idavailability"`
+	}
+
+	var params urlParam
+	if err := c.Bind(&params); err != nil {
+		log.Error().Err(err).Msg("Failed to bind request data")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
 	queries := models.New(db)
@@ -69,13 +83,7 @@ func HandleDeleteAvailability(c echo.Context) error {
 
 	qtx := queries.WithTx(tx)
 
-	professionalIdStr := c.Param("idprofessional")
-	professionalId, err := strconv.ParseInt(professionalIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for idprofessional."})
-	}
-
-	professionalUnit, err := qtx.GetProfessionalInfo(ctx, professionalId)
+	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		tx.Rollback()
 		if err == sql.ErrNoRows {
@@ -84,7 +92,7 @@ func HandleDeleteAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{availabilityId, true})
+	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{params.IDAvailability, true})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to load slots from availability", "description": err.Error()})
 	}
@@ -101,7 +109,7 @@ func HandleDeleteAvailability(c echo.Context) error {
 		}
 	}
 
-	availabilityDeleted, err := qtx.DeleteAvailabilityById(ctx, availabilityId)
+	availabilityDeleted, err := qtx.DeleteAvailabilityById(ctx, params.IDAvailability)
 	if err != nil {
 		tx.Rollback()
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to mark availability as deleted."})
@@ -126,6 +134,16 @@ func HandleCreateAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
+	type urlParam struct {
+		ReferenceKey string `param:"referencekey"`
+	}
+
+	var params urlParam
+	if err := c.Bind(&params); err != nil {
+		log.Error().Err(err).Msg("Failed to bind request data")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	}
+
 	var errors_list []string
 
 	// Validate if type Availability is in range of (0,2,3)
@@ -141,12 +159,6 @@ func HandleCreateAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error(s)	": errors_list})
 	}
 
-	professionalIdStr := c.Param("idprofessional")
-	professionalId, err := strconv.ParseInt(professionalIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert professional id as int"})
-	}
-
 	queries := models.New(db)
 
 	// Instanciate new transaction
@@ -158,7 +170,7 @@ func HandleCreateAvailability(c echo.Context) error {
 
 	qtx := queries.WithTx(tx)
 
-	professionalUnit, err := qtx.GetProfessionalInfo(ctx, professionalId)
+	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found"})
@@ -167,7 +179,7 @@ func HandleCreateAvailability(c echo.Context) error {
 	}
 
 	listBlockers, err := qtx.ListBlockerByProfessional(ctx, models.ListBlockerByProfessionalParams{
-		IDProfessional: professionalId,
+		IDProfessional: professionalUnit.IDProfessional,
 	})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to capture blockers", "description": err})
@@ -175,7 +187,7 @@ func HandleCreateAvailability(c echo.Context) error {
 
 	// create an author
 	insertedAvailability, err := qtx.InsertAvailability(ctx, models.InsertAvailabilityParams{
-		IDProfessional:   professionalId,
+		IDProfessional:   professionalUnit.IDProfessional,
 		InitDatetime:     availabilitySlot.InitDatetime,
 		EndDatetime:      availabilitySlot.EndDatetime,
 		InitHour:         availabilitySlot.InitHour,
@@ -207,7 +219,7 @@ func HandleCreateAvailability(c echo.Context) error {
 	for _, slot := range slots {
 
 		slotId, err := qtx.GetExistingSlot(ctx, models.GetExistingSlotParams{
-			IDProfessional: professionalId,
+			IDProfessional: professionalUnit.IDProfessional,
 			Datetime:       slot,
 			PriorityEntry:  insertedAvailability.PriorityEntry,
 		})
@@ -229,8 +241,8 @@ func HandleCreateAvailability(c echo.Context) error {
 			}
 
 			insertedSlot, err := qtx.InsertSlot(ctx, models.InsertSlotParams{
-				IDProfessional: professionalId,
-				IDAvailability: sql.NullInt64{insertedAvailability.IDAvailability, true},
+				IDProfessional: professionalUnit.IDProfessional,
+				IDAvailability: sql.NullInt64{Int64: insertedAvailability.IDAvailability, Valid: true},
 				Slot:           slot,
 				WeekdayName:    insertedAvailability.WeekdayName,
 				Interval:       insertedAvailability.Interval,
@@ -269,21 +281,21 @@ func HandleGetAvailability(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
+	type urlParam struct {
+		ReferenceKey   string `param:"referencekey"`
+		Deleted        bool   `query:"deleted"`
+		IDAvailability int64  `param:"idavailability"`
+	}
+
+	var params urlParam
+	if err := c.Bind(&params); err != nil {
+		log.Error().Err(err).Msg("Failed to bind request data")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	}
+
 	queries := models.New(db)
 
-	availabilityIdStr := c.Param("id")
-	availabilityId, err := strconv.ParseInt(availabilityIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for id availability."})
-	}
-
-	professionalIdStr := c.Param("idprofessional")
-	professionalId, err := strconv.ParseInt(professionalIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to convert id in int in URL param for idprofessional."})
-	}
-
-	professionalUnit, err := queries.GetProfessionalInfo(ctx, professionalId)
+	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
@@ -291,7 +303,7 @@ func HandleGetAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	unitAvailability, err := queries.ListAvailability(ctx, availabilityId)
+	unitAvailability, err := queries.ListAvailability(ctx, params.IDAvailability)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusNoContent, err)
