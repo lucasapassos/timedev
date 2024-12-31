@@ -19,6 +19,7 @@ func HandleGetProfessional(c echo.Context) error {
 
 	type urlParam struct {
 		ReferenceKey string `param:"referencekey"`
+		Delete       bool   `query:"deleted"`
 	}
 
 	var param urlParam
@@ -42,14 +43,9 @@ func HandleGetProfessional(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	query_deleted := c.QueryParam("deleted")
-	var is_delete bool
-	if query_deleted == "1" {
-		is_delete = true
-	}
 	availabilityValue, err := queries.ListAvailabilityByProfessionalId(ctx, models.ListAvailabilityByProfessionalIdParams{
 		IDProfessional: professionalValue.IDProfessional,
-		Deleted:        is_delete,
+		Deleted:        param.Delete,
 	})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)

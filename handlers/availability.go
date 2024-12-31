@@ -126,16 +126,19 @@ func HandleCreateAvailability(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	var availabilitySlot models.Availability
-
-	// Bind the incoming JSON data to the userInput struct
-	if err := c.Bind(&availabilitySlot); err != nil {
-		log.Error().Err(err).Msg("Failed to bind request data")
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
-	}
-
 	type urlParam struct {
-		ReferenceKey string `param:"referencekey"`
+		ReferenceKey     string    `param:"referencekey"`
+		IDAvailability   int64     `json:"id_availability"`
+		IDProfessional   int64     `json:"id_professional"`
+		InitDatetime     time.Time `json:"init_datetime"`
+		EndDatetime      time.Time `json:"end_datetime"`
+		InitHour         string    `json:"init_hour"`
+		EndHour          string    `json:"end_hour"`
+		TypeAvailability int64     `json:"type_availability"`
+		WeekdayName      string    `json:"weekday_name"`
+		Interval         int64     `json:"interval"`
+		PriorityEntry    int64     `json:"priority_entry"`
+		IsDeleted        int64     `json:"is_deleted"`
 	}
 
 	var params urlParam
@@ -147,11 +150,11 @@ func HandleCreateAvailability(c echo.Context) error {
 	var errors_list []string
 
 	// Validate if type Availability is in range of (0,2,3)
-	if !repository.IsValidTypeAvailability(availabilitySlot.TypeAvailability) {
+	if !repository.IsValidTypeAvailability(params.TypeAvailability) {
 		errors_list = append(errors_list, "Type Availability not in (0,2,3)")
 	}
 
-	if !repository.IsValidHour(availabilitySlot.InitHour) || !repository.IsValidHour(availabilitySlot.EndHour) {
+	if !repository.IsValidHour(params.InitHour) || !repository.IsValidHour(params.EndHour) {
 		errors_list = append(errors_list, "Error to parse End or Init Hour")
 	}
 
@@ -188,14 +191,14 @@ func HandleCreateAvailability(c echo.Context) error {
 	// create an author
 	insertedAvailability, err := qtx.InsertAvailability(ctx, models.InsertAvailabilityParams{
 		IDProfessional:   professionalUnit.IDProfessional,
-		InitDatetime:     availabilitySlot.InitDatetime,
-		EndDatetime:      availabilitySlot.EndDatetime,
-		InitHour:         availabilitySlot.InitHour,
-		EndHour:          availabilitySlot.EndHour,
-		TypeAvailability: availabilitySlot.TypeAvailability,
-		WeekdayName:      availabilitySlot.WeekdayName,
-		Interval:         availabilitySlot.Interval,
-		PriorityEntry:    availabilitySlot.PriorityEntry,
+		InitDatetime:     params.InitDatetime,
+		EndDatetime:      params.EndDatetime,
+		InitHour:         params.InitHour,
+		EndHour:          params.EndHour,
+		TypeAvailability: params.TypeAvailability,
+		WeekdayName:      params.WeekdayName,
+		Interval:         params.Interval,
+		PriorityEntry:    params.PriorityEntry,
 	})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err, "description": "Cannot insert Availability."})

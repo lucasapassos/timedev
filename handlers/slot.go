@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 	"timedev/db"
@@ -13,13 +12,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func HandleCreateSlot(e echo.Context) error {
+func HandleCreateSlot(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
 	defer db.Close()
 
 	type receivedDataStruct struct {
-		IDProfessional int64         `param:"idprofessional"`
+		ReferenceKey   string        `param:"referencekey"`
 		IDAvailability sql.NullInt64 `json:"idavailability"`
 		Slot           time.Time     `json:"slot"`
 		WeekdayName    time.Weekday  `json:"weekday_name"`
@@ -29,35 +28,35 @@ func HandleCreateSlot(e echo.Context) error {
 	}
 
 	var receivedData receivedDataStruct
-	if err := e.Bind(&receivedData); err != nil {
-		return e.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	if err := c.Bind(&receivedData); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to begin transaction", "description": err.Error()})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to begin transaction", "description": err.Error()})
 	}
 	defer tx.Rollback()
 
 	queries := models.New(tx)
 
-	professionalExists, err := queries.CheckProfessionalExists(ctx, receivedData.IDProfessional)
+	professionalUnit, err := queries.GetProfessionalInfo(ctx, receivedData.ReferenceKey)
 	if err != nil {
-		if (err == sql.ErrNoRows) && (professionalExists == 0) {
-			return e.JSON(http.StatusBadRequest, echo.Map{"error": "Professional does not exist"})
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": "Professional does not exist"})
 		}
-		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to check professional existence", "description": err.Error()})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to check professional existence", "description": err.Error()})
 	}
 
 	value_slot_return, err := queries.GetExistingSlot(ctx, models.GetExistingSlotParams{
-		IDProfessional: receivedData.IDProfessional,
+		IDProfessional: professionalUnit.IDProfessional,
 		Datetime:       receivedData.Slot,
 		PriorityEntry:  receivedData.PriorityEntry,
 	})
 	if err != nil {
 		if err == sql.ErrNoRows {
 			createdSlot, err := queries.CreateSlot(ctx, models.CreateSlotParams{
-				IDProfessional: receivedData.IDProfessional,
+				IDProfessional: professionalUnit.IDProfessional,
 				IDAvailability: sql.NullInt64{Valid: false},
 				Slot:           receivedData.Slot,
 				WeekdayName:    receivedData.Slot.Weekday().String(),
@@ -66,15 +65,15 @@ func HandleCreateSlot(e echo.Context) error {
 				StatusEntry:    receivedData.StatusEntry,
 			})
 			if err != nil {
-				return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to create slot", "description": err.Error()})
+				return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to create slot", "description": err.Error()})
 			}
 			tx.Commit()
-			return e.JSON(http.StatusCreated, createdSlot)
+			return c.JSON(http.StatusCreated, createdSlot)
 		}
-		return e.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to get slot state", "description": err.Error()})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to get slot state", "description": err.Error()})
 	}
 
-	return e.JSON(http.StatusBadRequest, echo.Map{"error": "Slot already exists", "description": value_slot_return})
+	return c.JSON(http.StatusBadRequest, echo.Map{"error": "Slot already exists", "description": value_slot_return})
 }
 
 func HandleGetSlot(c echo.Context) error {
@@ -82,23 +81,21 @@ func HandleGetSlot(c echo.Context) error {
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	slotIdStr := c.Param("idslot")
-	slotId, err := strconv.ParseInt(slotIdStr, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to parse Slotid into number."})
+	type urlParam struct {
+		slotId  int64 `param:"idslot"`
+		Deleted bool  `query:"deleted"`
+	}
+
+	var param urlParam
+	if err := c.Bind(&param); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
 	queries := models.New(db)
 
-	query_deleted := c.QueryParam("deleted")
-	var is_delete bool
-	if query_deleted == "1" {
-		is_delete = true
-	}
-
 	slotUnit, err := queries.GetSlotById(ctx, models.GetSlotByIdParams{
-		IDSlot:  slotId,
-		Deleted: is_delete,
+		IDSlot:  param.slotId,
+		Deleted: param.Deleted,
 	})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)
@@ -107,23 +104,23 @@ func HandleGetSlot(c echo.Context) error {
 	return c.JSON(http.StatusOK, slotUnit)
 }
 
-type SlotUnit struct {
-	IDProfessional int64     `query:"id_professional"`
-	IdClinica      string    `query:"idclinica"`
-	SlotInit       time.Time `query:"slot_init"`
-	SlotEnd        time.Time `query:"slot_end"`
-	IsOpen         bool      `query:"is_open"`
-	Especialidade  string    `query:"especialidade"`
-}
-
 func HandleListSlots(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
 	defer db.Close()
 
-	slotUnit := new(SlotUnit)
+	type SlotUnit struct {
+		IDProfessional int64     `query:"id_professional"`
+		IdClinica      string    `query:"idclinica"`
+		SlotInit       time.Time `query:"slot_init"`
+		SlotEnd        time.Time `query:"slot_end"`
+		IsOpen         bool      `query:"is_open"`
+		Especialidade  string    `query:"especialidade"`
+	}
+
+	var slotUnit SlotUnit
 	// Bind the incoming JSON data to the userInput struct
-	if err := c.Bind(slotUnit); err != nil {
+	if err := c.Bind(&slotUnit); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 

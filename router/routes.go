@@ -24,7 +24,7 @@ func SetupRoutes(app *echo.Echo) {
 	api.DELETE("/professional/:referencekey/availability/:idavailability", handlers.HandleDeleteAvailability)
 	api.POST("/professional/:referencekey/availability", handlers.HandleCreateAvailability)
 	api.GET("/professional/:referencekey/availability", handlers.HandleListAvailability)
-	api.GET("/professional/:referencekey/availability/:id", handlers.HandleGetAvailability)
+	api.GET("/professional/:referencekey/availability/:idavailability", handlers.HandleGetAvailability)
 
 	// blockers
 	api.POST("/professional/:referencekey/blocker", handlers.HandleCreateBlocker)
