@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"timedev/db"
+	"timedev/repository"
 	"timedev/sql/models"
 
 	"github.com/labstack/echo/v4"
@@ -82,7 +83,7 @@ func HandleGetSlot(c echo.Context) error {
 	defer db.Close()
 
 	type urlParam struct {
-		slotId  int64 `param:"idslot"`
+		SlotId  int64 `param:"idslot"`
 		Deleted bool  `query:"deleted"`
 	}
 
@@ -94,7 +95,7 @@ func HandleGetSlot(c echo.Context) error {
 	queries := models.New(db)
 
 	slotUnit, err := queries.GetSlotById(ctx, models.GetSlotByIdParams{
-		IDSlot:  param.slotId,
+		IDSlot:  param.SlotId,
 		Deleted: param.Deleted,
 	})
 	if err != nil {
@@ -110,22 +111,33 @@ func HandleListSlots(c echo.Context) error {
 	defer db.Close()
 
 	type SlotUnit struct {
-		IDProfessional int64     `query:"id_professional"`
-		IdClinica      string    `query:"idclinica"`
-		SlotInit       time.Time `query:"slot_init"`
-		SlotEnd        time.Time `query:"slot_end"`
-		IsOpen         bool      `query:"is_open"`
-		Especialidade  string    `query:"especialidade"`
+		ReferenceKey  string    `query:"reference_key"`
+		IdClinica     string    `query:"idclinica"`
+		SlotInit      time.Time `query:"slot_init"`
+		SlotEnd       time.Time `query:"slot_end"`
+		HourInit      string    `query:"hour_init"`
+		HourEnd       string    `query:"hour_end"`
+		IsOpen        bool      `query:"is_open"`
+		Especialidade string    `query:"especialidade"`
+		IsDeleted     bool      `query:"deleted"`
 	}
 
 	var slotUnit SlotUnit
-	// Bind the incoming JSON data to the userInput struct
 	if err := c.Bind(&slotUnit); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
 	}
 
+	var is_hour bool
+	if slotUnit.HourInit != "" && slotUnit.HourEnd != "" {
+		if !repository.IsValidHour(slotUnit.HourInit) || !repository.IsValidHour(slotUnit.HourEnd) {
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid hour format"})
+		} else {
+			is_hour = true
+		}
+	}
+
 	var is_professional bool
-	if slotUnit.IDProfessional != 0 {
+	if slotUnit.ReferenceKey != "" {
 		is_professional = true
 	}
 
@@ -145,16 +157,126 @@ func HandleListSlots(c echo.Context) error {
 		SlotInit:        slotUnit.SlotInit,
 		SlotEnd:         slotUnit.SlotEnd,
 		IsProfessional:  is_professional,
-		IDProfessional:  slotUnit.IDProfessional,
+		ReferenceKey:    strings.Split(slotUnit.ReferenceKey, ","),
 		IsIdclinica:     is_idclinica,
 		Idclinica:       strings.Split(slotUnit.IdClinica, ","),
 		IsOpen:          slotUnit.IsOpen,
 		IsEspecialidade: is_especialidade,
 		Especialidade:   strings.Split(slotUnit.Especialidade, ","),
+		Deleted:         slotUnit.IsDeleted,
+		IsHour:          is_hour,
+		InitHour:        slotUnit.HourInit,
+		EndHour:         slotUnit.HourEnd,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, slots)
+}
+
+func HandleUpdateSlot(c echo.Context) error {
+	ctx := context.Background()
+	db := db.OpenDBConnection()
+	defer db.Close()
+
+	type receivedDataStruct struct {
+		SlotId        int64  `param:"idslot"`
+		PriorityEntry int64  `json:"priority_entry"`
+		StatusEntry   string `json:"status_entry"`
+		Owner         string `json:"owner"`
+		ExternalID    string `json:"external_id"`
+	}
+
+	var receivedData receivedDataStruct
+	if err := c.Bind(&receivedData); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to begin transaction", "description": err.Error()})
+	}
+	defer tx.Rollback()
+
+	queries := models.New(tx)
+
+	slotUnit, err := queries.GetSlotById(ctx, models.GetSlotByIdParams{IDSlot: receivedData.SlotId})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "Slot does not exist"})
+		}
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	if receivedData.PriorityEntry != 0 {
+		slotUnit.PriorityEntry = receivedData.PriorityEntry
+	}
+
+	if receivedData.StatusEntry != "" {
+		slotUnit.StatusEntry = receivedData.StatusEntry
+	}
+
+	if receivedData.Owner != "" {
+		slotUnit.Owner = sql.NullString{String: receivedData.Owner, Valid: receivedData.Owner != ""}
+	}
+
+	if receivedData.ExternalID != "" {
+		slotUnit.ExternalID = sql.NullString{String: receivedData.ExternalID, Valid: receivedData.ExternalID != ""}
+	}
+
+	updatedSlot, err := queries.UpdateSlot(ctx, models.UpdateSlotParams{
+		IDSlot:        slotUnit.IDSlot,
+		PriorityEntry: slotUnit.PriorityEntry,
+		StatusEntry:   slotUnit.StatusEntry,
+		Owner:         slotUnit.Owner,
+		ExternalID:    slotUnit.ExternalID,
+	})
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to update slot", "description": err.Error()})
+	}
+
+	tx.Commit()
+	return c.JSON(http.StatusOK, updatedSlot)
+}
+
+func HandleDeleteSlot(c echo.Context) error {
+	ctx := context.Background()
+	db := db.OpenDBConnection()
+	defer db.Close()
+
+	type urlParam struct {
+		SlotId int64 `param:"idslot"`
+	}
+
+	var param urlParam
+	if err := c.Bind(&param); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request data"})
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to begin transaction", "description": err.Error()})
+	}
+	defer tx.Rollback()
+
+	queries := models.New(tx)
+
+	slotUnit, err := queries.GetSlotById(ctx, models.GetSlotByIdParams{IDSlot: param.SlotId})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "Slot does not exist"})
+		}
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	err = queries.DeleteSlotById(ctx, slotUnit.IDSlot)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete slot", "description": err.Error()})
+	}
+
+	tx.Commit()
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "Slot deleted"})
+
 }

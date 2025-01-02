@@ -43,7 +43,7 @@ INSERT INTO slot(
   ?6,
   ?7
 )
-RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, is_deleted, id_blocker
+RETURNING id_slot, inserted_at, updated_at, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, external_id, owner, is_deleted, deleted_at, id_blocker
 `
 
 type CreateSlotParams struct {
@@ -69,6 +69,8 @@ func (q *Queries) CreateSlot(ctx context.Context, arg CreateSlotParams) (Slot, e
 	var i Slot
 	err := row.Scan(
 		&i.IDSlot,
+		&i.InsertedAt,
+		&i.UpdatedAt,
 		&i.IDAvailability,
 		&i.IDProfessional,
 		&i.Slot,
@@ -76,7 +78,10 @@ func (q *Queries) CreateSlot(ctx context.Context, arg CreateSlotParams) (Slot, e
 		&i.Interval,
 		&i.PriorityEntry,
 		&i.StatusEntry,
+		&i.ExternalID,
+		&i.Owner,
 		&i.IsDeleted,
+		&i.DeletedAt,
 		&i.IDBlocker,
 	)
 	return i, err
@@ -86,7 +91,7 @@ const deleteAvailabilityById = `-- name: DeleteAvailabilityById :one
 UPDATE availability
 SET is_deleted = 1
 WHERE id_availability == ?1
-RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, priority_entry, is_deleted
+RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, resting, priority_entry, is_deleted
 `
 
 func (q *Queries) DeleteAvailabilityById(ctx context.Context, idAvailability int64) (Availability, error) {
@@ -102,6 +107,7 @@ func (q *Queries) DeleteAvailabilityById(ctx context.Context, idAvailability int
 		&i.TypeAvailability,
 		&i.WeekdayName,
 		&i.Interval,
+		&i.Resting,
 		&i.PriorityEntry,
 		&i.IsDeleted,
 	)
@@ -132,7 +138,9 @@ func (q *Queries) DeleteBlockerById(ctx context.Context, idBlocker int64) (Block
 
 const deleteSlotById = `-- name: DeleteSlotById :exec
 UPDATE slot
-SET is_deleted = 1
+SET is_deleted = 1,
+  updated_at = CURRENT_TIMESTAMP,
+  deleted_at = CURRENT_TIMESTAMP
 WHERE id_slot == ?1
 `
 
@@ -238,6 +246,8 @@ func (q *Queries) GetProfessionalInfo(ctx context.Context, referenceKey string) 
 const getSlotById = `-- name: GetSlotById :one
 SELECT
   id_slot,
+  inserted_at,
+  updated_at,
   id_professional,
   id_availability,
   slot,
@@ -245,6 +255,8 @@ SELECT
   interval,
   priority_entry,
   status_entry,
+  owner,
+  external_id,
   is_deleted
 FROM slot
 WHERE 1=1
@@ -258,15 +270,19 @@ type GetSlotByIdParams struct {
 }
 
 type GetSlotByIdRow struct {
-	IDSlot         int64         `json:"id_slot"`
-	IDProfessional int64         `json:"id_professional"`
-	IDAvailability sql.NullInt64 `json:"id_availability"`
-	Slot           time.Time     `json:"slot"`
-	WeekdayName    string        `json:"weekday_name"`
-	Interval       int64         `json:"interval"`
-	PriorityEntry  int64         `json:"priority_entry"`
-	StatusEntry    string        `json:"status_entry"`
-	IsDeleted      int64         `json:"is_deleted"`
+	IDSlot         int64          `json:"id_slot"`
+	InsertedAt     time.Time      `json:"inserted_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	IDProfessional int64          `json:"id_professional"`
+	IDAvailability sql.NullInt64  `json:"id_availability"`
+	Slot           time.Time      `json:"slot"`
+	WeekdayName    string         `json:"weekday_name"`
+	Interval       int64          `json:"interval"`
+	PriorityEntry  int64          `json:"priority_entry"`
+	StatusEntry    string         `json:"status_entry"`
+	Owner          sql.NullString `json:"owner"`
+	ExternalID     sql.NullString `json:"external_id"`
+	IsDeleted      int64          `json:"is_deleted"`
 }
 
 func (q *Queries) GetSlotById(ctx context.Context, arg GetSlotByIdParams) (GetSlotByIdRow, error) {
@@ -274,6 +290,8 @@ func (q *Queries) GetSlotById(ctx context.Context, arg GetSlotByIdParams) (GetSl
 	var i GetSlotByIdRow
 	err := row.Scan(
 		&i.IDSlot,
+		&i.InsertedAt,
+		&i.UpdatedAt,
 		&i.IDProfessional,
 		&i.IDAvailability,
 		&i.Slot,
@@ -281,6 +299,8 @@ func (q *Queries) GetSlotById(ctx context.Context, arg GetSlotByIdParams) (GetSl
 		&i.Interval,
 		&i.PriorityEntry,
 		&i.StatusEntry,
+		&i.Owner,
+		&i.ExternalID,
 		&i.IsDeleted,
 	)
 	return i, err
@@ -326,12 +346,13 @@ INSERT INTO availability (
     type_availability,
     weekday_name,
     interval,
+    resting,
     priority_entry,
     is_deleted
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
 )
-RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, priority_entry, is_deleted
+RETURNING id_availability, id_professional, init_datetime, end_datetime, init_hour, end_hour, type_availability, weekday_name, interval, resting, priority_entry, is_deleted
 `
 
 type InsertAvailabilityParams struct {
@@ -343,6 +364,7 @@ type InsertAvailabilityParams struct {
 	TypeAvailability int64     `json:"type_availability"`
 	WeekdayName      string    `json:"weekday_name"`
 	Interval         int64     `json:"interval"`
+	Resting          int64     `json:"resting"`
 	PriorityEntry    int64     `json:"priority_entry"`
 }
 
@@ -356,6 +378,7 @@ func (q *Queries) InsertAvailability(ctx context.Context, arg InsertAvailability
 		arg.TypeAvailability,
 		arg.WeekdayName,
 		arg.Interval,
+		arg.Resting,
 		arg.PriorityEntry,
 	)
 	var i Availability
@@ -369,6 +392,7 @@ func (q *Queries) InsertAvailability(ctx context.Context, arg InsertAvailability
 		&i.TypeAvailability,
 		&i.WeekdayName,
 		&i.Interval,
+		&i.Resting,
 		&i.PriorityEntry,
 		&i.IsDeleted,
 	)
@@ -422,11 +446,6 @@ func (q *Queries) InsertBlocker(ctx context.Context, arg InsertBlockerParams) (B
 }
 
 const insertProfessional = `-- name: InsertProfessional :one
-
-
-
-
-
 INSERT INTO professional (
   reference_key,
   nome,
@@ -443,31 +462,6 @@ type InsertProfessionalParams struct {
 	Especialidade string `json:"especialidade"`
 }
 
-// -- name: GetAuthor :one
-// SELECT * FROM authors
-// WHERE id = ? LIMIT 1;
-// -- name: ListAuthors :many
-// SELECT * FROM authors
-// ORDER BY name;
-// -- name: CreateAuthor :one
-// INSERT INTO authors (
-//
-//	name, bio
-//
-// ) VALUES (
-//
-//	?, ?
-//
-// )
-// RETURNING *;
-// -- name: UpdateAuthor :exec
-// UPDATE authors
-// set name = ?,
-// bio = ?
-// WHERE id = ?;
-// -- name: DeleteAuthor :exec
-// DELETE FROM authors
-// WHERE id = ?;
 func (q *Queries) InsertProfessional(ctx context.Context, arg InsertProfessionalParams) (Professional, error) {
 	row := q.db.QueryRowContext(ctx, insertProfessional, arg.ReferenceKey, arg.Nome, arg.Especialidade)
 	var i Professional
@@ -589,9 +583,23 @@ FROM availability
 WHERE id_availability = ? LIMIT 1
 `
 
-func (q *Queries) ListAvailability(ctx context.Context, idAvailability int64) (Availability, error) {
+type ListAvailabilityRow struct {
+	IDAvailability   int64     `json:"id_availability"`
+	IDProfessional   int64     `json:"id_professional"`
+	InitDatetime     time.Time `json:"init_datetime"`
+	EndDatetime      time.Time `json:"end_datetime"`
+	InitHour         string    `json:"init_hour"`
+	EndHour          string    `json:"end_hour"`
+	TypeAvailability int64     `json:"type_availability"`
+	WeekdayName      string    `json:"weekday_name"`
+	Interval         int64     `json:"interval"`
+	PriorityEntry    int64     `json:"priority_entry"`
+	IsDeleted        int64     `json:"is_deleted"`
+}
+
+func (q *Queries) ListAvailability(ctx context.Context, idAvailability int64) (ListAvailabilityRow, error) {
 	row := q.db.QueryRowContext(ctx, listAvailability, idAvailability)
-	var i Availability
+	var i ListAvailabilityRow
 	err := row.Scan(
 		&i.IDAvailability,
 		&i.IDProfessional,
@@ -742,34 +750,45 @@ func (q *Queries) ListBlockerByProfessional(ctx context.Context, arg ListBlocker
 const listSlots = `-- name: ListSlots :many
 SELECT
   s.id_slot,
-  s.id_professional,
+  s.status_entry,
+  s.inserted_at,
+  s.updated_at,
+  p.reference_key,
   s.id_availability,
   s.slot,
   p.especialidade,
   s.weekday_name,
   s.interval,
   s.priority_entry,
-  s.status_entry,
+  s.owner,
+  s.external_id,
+  s.is_deleted,
+  s.deleted_at,
   s.id_blocker
 FROM slot s
 LEFT JOIN professional p on s.id_professional = p.id_professional
 WHERE 1=1
-  AND s.is_deleted = 0
-  AND datetime(slot) between datetime(?1) and datetime(?2)
-  AND CASE WHEN ?3 == true THEN s.id_professional == ?4 ELSE 1 END
-  AND CASE WHEN ?5 == true THEN s.status_entry == 'open' ELSE 1 END
-  AND CASE WHEN ?6 == true THEN p.especialidade in (/*SLICE:especialidade*/?) ELSE 1 END
-  AND CASE WHEN ?8 == true THEN s.id_professional in (
+  AND CASE WHEN ?1 == true THEN 1 ELSE is_deleted == 0 END
+  AND CASE WHEN ?2 == true THEN time(datetime(slot, '-3 hour')) between time(?3) and time(?4) ELSE 1 END
+  AND datetime(slot) between datetime(?5) and datetime(?6)
+  AND CASE WHEN ?7 == true THEN p.reference_key in (/*SLICE:reference_key*/?) ELSE 1 END
+  AND CASE WHEN ?9 == true THEN s.status_entry == 'open' ELSE 1 END
+  AND CASE WHEN ?10 == true THEN p.especialidade in (/*SLICE:especialidade*/?) ELSE 1 END
+  AND CASE WHEN ?12 == true THEN s.id_professional in (
     SELECT a.id_professional FROM attribute a WHERE attribute == 'idclinica' and value in (/*SLICE:idclinica*/?)
   ) ELSE 1 END
 ORDER BY s.slot
 `
 
 type ListSlotsParams struct {
+	Deleted         interface{} `json:"deleted"`
+	IsHour          interface{} `json:"is_hour"`
+	InitHour        interface{} `json:"init_hour"`
+	EndHour         interface{} `json:"end_hour"`
 	SlotInit        interface{} `json:"slot_init"`
 	SlotEnd         interface{} `json:"slot_end"`
 	IsProfessional  interface{} `json:"is_professional"`
-	IDProfessional  int64       `json:"id_professional"`
+	ReferenceKey    []string    `json:"reference_key"`
 	IsOpen          interface{} `json:"is_open"`
 	IsEspecialidade interface{} `json:"is_especialidade"`
 	Especialidade   []string    `json:"especialidade"`
@@ -779,24 +798,41 @@ type ListSlotsParams struct {
 
 type ListSlotsRow struct {
 	IDSlot         int64          `json:"id_slot"`
-	IDProfessional int64          `json:"id_professional"`
+	StatusEntry    string         `json:"status_entry"`
+	InsertedAt     time.Time      `json:"inserted_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	ReferenceKey   sql.NullString `json:"reference_key"`
 	IDAvailability sql.NullInt64  `json:"id_availability"`
 	Slot           time.Time      `json:"slot"`
 	Especialidade  sql.NullString `json:"especialidade"`
 	WeekdayName    string         `json:"weekday_name"`
 	Interval       int64          `json:"interval"`
 	PriorityEntry  int64          `json:"priority_entry"`
-	StatusEntry    string         `json:"status_entry"`
+	Owner          sql.NullString `json:"owner"`
+	ExternalID     sql.NullString `json:"external_id"`
+	IsDeleted      int64          `json:"is_deleted"`
+	DeletedAt      sql.NullTime   `json:"deleted_at"`
 	IDBlocker      sql.NullInt64  `json:"id_blocker"`
 }
 
 func (q *Queries) ListSlots(ctx context.Context, arg ListSlotsParams) ([]ListSlotsRow, error) {
 	query := listSlots
 	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Deleted)
+	queryParams = append(queryParams, arg.IsHour)
+	queryParams = append(queryParams, arg.InitHour)
+	queryParams = append(queryParams, arg.EndHour)
 	queryParams = append(queryParams, arg.SlotInit)
 	queryParams = append(queryParams, arg.SlotEnd)
 	queryParams = append(queryParams, arg.IsProfessional)
-	queryParams = append(queryParams, arg.IDProfessional)
+	if len(arg.ReferenceKey) > 0 {
+		for _, v := range arg.ReferenceKey {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:reference_key*/?", strings.Repeat(",?", len(arg.ReferenceKey))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:reference_key*/?", "NULL", 1)
+	}
 	queryParams = append(queryParams, arg.IsOpen)
 	queryParams = append(queryParams, arg.IsEspecialidade)
 	if len(arg.Especialidade) > 0 {
@@ -826,14 +862,20 @@ func (q *Queries) ListSlots(ctx context.Context, arg ListSlotsParams) ([]ListSlo
 		var i ListSlotsRow
 		if err := rows.Scan(
 			&i.IDSlot,
-			&i.IDProfessional,
+			&i.StatusEntry,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+			&i.ReferenceKey,
 			&i.IDAvailability,
 			&i.Slot,
 			&i.Especialidade,
 			&i.WeekdayName,
 			&i.Interval,
 			&i.PriorityEntry,
-			&i.StatusEntry,
+			&i.Owner,
+			&i.ExternalID,
+			&i.IsDeleted,
+			&i.DeletedAt,
 			&i.IDBlocker,
 		); err != nil {
 			return nil, err
@@ -881,14 +923,63 @@ func (q *Queries) ListSlotsByIdAvailability(ctx context.Context, idAvailability 
 	return items, nil
 }
 
+const updateSlot = `-- name: UpdateSlot :one
+UPDATE slot
+SET status_entry = ?1,
+    priority_entry = ?2,
+    owner = ?3,
+    external_id = ?4,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id_slot == ?5
+RETURNING id_slot, inserted_at, updated_at, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, external_id, owner, is_deleted, deleted_at, id_blocker
+`
+
+type UpdateSlotParams struct {
+	StatusEntry   string         `json:"status_entry"`
+	PriorityEntry int64          `json:"priority_entry"`
+	Owner         sql.NullString `json:"owner"`
+	ExternalID    sql.NullString `json:"external_id"`
+	IDSlot        int64          `json:"id_slot"`
+}
+
+func (q *Queries) UpdateSlot(ctx context.Context, arg UpdateSlotParams) (Slot, error) {
+	row := q.db.QueryRowContext(ctx, updateSlot,
+		arg.StatusEntry,
+		arg.PriorityEntry,
+		arg.Owner,
+		arg.ExternalID,
+		arg.IDSlot,
+	)
+	var i Slot
+	err := row.Scan(
+		&i.IDSlot,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+		&i.IDAvailability,
+		&i.IDProfessional,
+		&i.Slot,
+		&i.WeekdayName,
+		&i.Interval,
+		&i.PriorityEntry,
+		&i.StatusEntry,
+		&i.ExternalID,
+		&i.Owner,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.IDBlocker,
+	)
+	return i, err
+}
+
 const updateSlotSetBlocker = `-- name: UpdateSlotSetBlocker :many
 UPDATE slot
 SET status_entry = ?1,
-	  id_blocker = ?2
+	  id_blocker = ?2,
+    updated_at = CURRENT_TIMESTAMP
 WHERE 1=1
 	AND id_professional = ?3
   AND slot >= ?4 AND slot <= ?5
-RETURNING id_slot, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, is_deleted, id_blocker
+RETURNING id_slot, inserted_at, updated_at, id_availability, id_professional, slot, weekday_name, interval, priority_entry, status_entry, external_id, owner, is_deleted, deleted_at, id_blocker
 `
 
 type UpdateSlotSetBlockerParams struct {
@@ -916,6 +1007,8 @@ func (q *Queries) UpdateSlotSetBlocker(ctx context.Context, arg UpdateSlotSetBlo
 		var i Slot
 		if err := rows.Scan(
 			&i.IDSlot,
+			&i.InsertedAt,
+			&i.UpdatedAt,
 			&i.IDAvailability,
 			&i.IDProfessional,
 			&i.Slot,
@@ -923,7 +1016,10 @@ func (q *Queries) UpdateSlotSetBlocker(ctx context.Context, arg UpdateSlotSetBlo
 			&i.Interval,
 			&i.PriorityEntry,
 			&i.StatusEntry,
+			&i.ExternalID,
+			&i.Owner,
 			&i.IsDeleted,
+			&i.DeletedAt,
 			&i.IDBlocker,
 		); err != nil {
 			return nil, err

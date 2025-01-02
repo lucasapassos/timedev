@@ -137,6 +137,7 @@ func HandleCreateAvailability(c echo.Context) error {
 		TypeAvailability int64     `json:"type_availability"`
 		WeekdayName      string    `json:"weekday_name"`
 		Interval         int64     `json:"interval"`
+		Resting          int64     `json:"resting"`
 		PriorityEntry    int64     `json:"priority_entry"`
 		IsDeleted        int64     `json:"is_deleted"`
 	}
@@ -198,6 +199,7 @@ func HandleCreateAvailability(c echo.Context) error {
 		TypeAvailability: params.TypeAvailability,
 		WeekdayName:      params.WeekdayName,
 		Interval:         params.Interval,
+		Resting:          params.Resting,
 		PriorityEntry:    params.PriorityEntry,
 	})
 	if err != nil {
@@ -208,8 +210,9 @@ func HandleCreateAvailability(c echo.Context) error {
 		insertedAvailability.InitDatetime,
 		insertedAvailability.EndDatetime,
 		insertedAvailability.WeekdayName,
-		int(insertedAvailability.Interval),
-		int(insertedAvailability.TypeAvailability),
+		insertedAvailability.Interval,
+		insertedAvailability.Resting,
+		insertedAvailability.TypeAvailability,
 		insertedAvailability.InitHour,
 		insertedAvailability.EndHour,
 	)

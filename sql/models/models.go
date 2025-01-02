@@ -26,6 +26,7 @@ type Availability struct {
 	TypeAvailability int64     `json:"type_availability"`
 	WeekdayName      string    `json:"weekday_name"`
 	Interval         int64     `json:"interval"`
+	Resting          int64     `json:"resting"`
 	PriorityEntry    int64     `json:"priority_entry"`
 	IsDeleted        int64     `json:"is_deleted"`
 }
@@ -48,14 +49,19 @@ type Professional struct {
 }
 
 type Slot struct {
-	IDSlot         int64         `json:"id_slot"`
-	IDAvailability sql.NullInt64 `json:"id_availability"`
-	IDProfessional int64         `json:"id_professional"`
-	Slot           time.Time     `json:"slot"`
-	WeekdayName    string        `json:"weekday_name"`
-	Interval       int64         `json:"interval"`
-	PriorityEntry  int64         `json:"priority_entry"`
-	StatusEntry    string        `json:"status_entry"`
-	IsDeleted      int64         `json:"is_deleted"`
-	IDBlocker      sql.NullInt64 `json:"id_blocker"`
+	IDSlot         int64          `json:"id_slot"`
+	InsertedAt     time.Time      `json:"inserted_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	IDAvailability sql.NullInt64  `json:"id_availability"`
+	IDProfessional int64          `json:"id_professional"`
+	Slot           time.Time      `json:"slot"`
+	WeekdayName    string         `json:"weekday_name"`
+	Interval       int64          `json:"interval"`
+	PriorityEntry  int64          `json:"priority_entry"`
+	StatusEntry    string         `json:"status_entry"`
+	ExternalID     sql.NullString `json:"external_id"`
+	Owner          sql.NullString `json:"owner"`
+	IsDeleted      int64          `json:"is_deleted"`
+	DeletedAt      sql.NullTime   `json:"deleted_at"`
+	IDBlocker      sql.NullInt64  `json:"id_blocker"`
 }

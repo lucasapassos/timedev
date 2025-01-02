@@ -1,29 +1,3 @@
--- -- name: GetAuthor :one
--- SELECT * FROM authors
--- WHERE id = ? LIMIT 1;
-
--- -- name: ListAuthors :many
--- SELECT * FROM authors
--- ORDER BY name;
-
--- -- name: CreateAuthor :one
--- INSERT INTO authors (
---   name, bio
--- ) VALUES (
---   ?, ?
--- )
--- RETURNING *;
-
--- -- name: UpdateAuthor :exec
--- UPDATE authors
--- set name = ?,
--- bio = ?
--- WHERE id = ?;
-
--- -- name: DeleteAuthor :exec
--- DELETE FROM authors
--- WHERE id = ?;
-
 -- name: InsertProfessional :one
 INSERT INTO professional (
   reference_key,
@@ -55,10 +29,11 @@ INSERT INTO availability (
     type_availability,
     weekday_name,
     interval,
+    resting,
     priority_entry,
     is_deleted
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
 )
 RETURNING *;
 
@@ -87,6 +62,16 @@ WHERE 1=1
 	AND datetime(?) between datetime(slot) and datetime(slot, concat(s."interval" - 1, ' minute'))
     AND priority_entry = ?;
 
+-- name: UpdateSlot :one
+UPDATE slot
+SET status_entry = @status_entry,
+    priority_entry = @priority_entry,
+    owner = @owner,
+    external_id = @external_id,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id_slot == @id_slot
+RETURNING *;
+
 -- name: InsertSlot :one
 INSERT INTO slot (
     id_professional,
@@ -114,21 +99,28 @@ RETURNING slot;
 -- name: ListSlots :many
 SELECT
   s.id_slot,
-  s.id_professional,
+  s.status_entry,
+  s.inserted_at,
+  s.updated_at,
+  p.reference_key,
   s.id_availability,
   s.slot,
   p.especialidade,
   s.weekday_name,
   s.interval,
   s.priority_entry,
-  s.status_entry,
+  s.owner,
+  s.external_id,
+  s.is_deleted,
+  s.deleted_at,
   s.id_blocker
 FROM slot s
 LEFT JOIN professional p on s.id_professional = p.id_professional
 WHERE 1=1
-  AND s.is_deleted = 0
+  AND CASE WHEN @deleted == true THEN 1 ELSE is_deleted == 0 END
+  AND CASE WHEN @is_hour == true THEN time(datetime(slot, '-3 hour')) between time(@init_hour) and time(@end_hour) ELSE 1 END
   AND datetime(slot) between datetime(@slot_init) and datetime(@slot_end)
-  AND CASE WHEN @is_professional == true THEN s.id_professional == @id_professional ELSE 1 END
+  AND CASE WHEN @is_professional == true THEN p.reference_key in (sqlc.slice('reference_key')) ELSE 1 END
   AND CASE WHEN @is_open == true THEN s.status_entry == 'open' ELSE 1 END
   AND CASE WHEN @is_especialidade == true THEN p.especialidade in (sqlc.slice('especialidade')) ELSE 1 END
   AND CASE WHEN @is_idclinica == true THEN s.id_professional in (
@@ -146,7 +138,9 @@ WHERE 1=1
 
 -- name: DeleteSlotById :exec
 UPDATE slot
-SET is_deleted = 1
+SET is_deleted = 1,
+  updated_at = CURRENT_TIMESTAMP,
+  deleted_at = CURRENT_TIMESTAMP
 WHERE id_slot == @id_slot;
 
 -- name: DeleteAvailabilityById :one
@@ -192,6 +186,8 @@ WHERE 1=1
 -- name: GetSlotById :one
 SELECT
   id_slot,
+  inserted_at,
+  updated_at,
   id_professional,
   id_availability,
   slot,
@@ -199,6 +195,8 @@ SELECT
   interval,
   priority_entry,
   status_entry,
+  owner,
+  external_id,
   is_deleted
 FROM slot
 WHERE 1=1
@@ -257,7 +255,8 @@ RETURNING *;
 -- name: UpdateSlotSetBlocker :many
 UPDATE slot
 SET status_entry = @status_entry,
-	  id_blocker = @id_blocker
+	  id_blocker = @id_blocker,
+    updated_at = CURRENT_TIMESTAMP
 WHERE 1=1
 	AND id_professional = @id_professional
   AND slot >= @init_blocker AND slot <= @end_blocker

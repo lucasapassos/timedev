@@ -12,6 +12,8 @@ func SetupRoutes(app *echo.Echo) {
 
 	// slots
 	api.POST("/professional/:referencekey/slot", handlers.HandleCreateSlot)
+	api.PATCH("/slot/:idslot", handlers.HandleUpdateSlot)
+	api.DELETE("/slot/:idslot", handlers.HandleDeleteSlot)
 	api.GET("/slot", handlers.HandleListSlots)
 	api.GET("/slot/:idslot", handlers.HandleGetSlot)
 
