@@ -92,7 +92,7 @@ func HandleDeleteAvailability(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{params.IDAvailability, true})
+	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{Int64: params.IDAvailability, Valid: true})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to load slots from availability", "description": err.Error()})
 	}
