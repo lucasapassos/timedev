@@ -2,8 +2,6 @@ package repository
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"time"
 )
 
@@ -131,21 +129,26 @@ func SplitTimeRange(hourStart, hourEnd time.Time, interval, resting time.Duratio
 }
 
 func ComputeAgenda(initialHour, endHour string, daysToCompute []time.Time, duration, resting time.Duration) ([]time.Time, error) {
-	layout := "2006-01-02 15:04:05"
 
-	startTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s:00", initialHour))
+	startTime, err := time.Parse("15:04", initialHour)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	endTime, err := time.Parse(layout, fmt.Sprintf("1970-01-01 %s:00", endHour))
+	endTime, err := time.Parse("15:04", endHour)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	var list_slots []time.Time
 
 	for _, dayCompute := range daysToCompute {
+
+		endDay := dayCompute
+		if startTime.After(endTime) {
+			endDay = dayCompute.Add(24 * time.Hour)
+		}
+
 		tempStartDayTime := time.Date(
 			dayCompute.Year(),
 			dayCompute.Month(),
@@ -160,7 +163,7 @@ func ComputeAgenda(initialHour, endHour string, daysToCompute []time.Time, durat
 		tempEndDayTime := time.Date(
 			dayCompute.Year(),
 			dayCompute.Month(),
-			dayCompute.Day(),
+			endDay.Day(),
 			endTime.Hour(),
 			endTime.Minute(),
 			endTime.Second(),

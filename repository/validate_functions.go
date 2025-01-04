@@ -20,7 +20,7 @@ func IsValidDatetime(dt string) bool {
 }
 
 func IsValidHour(hr string) bool {
-	matched, _ := regexp.MatchString(`^[012][0-9]:[012][0-9]$`, hr)
+	matched, _ := regexp.MatchString(`^[012][0-9]:[0-5][0-9]$`, hr)
 	if matched {
 		return true
 	} else {
