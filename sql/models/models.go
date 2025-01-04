@@ -5,63 +5,72 @@
 package models
 
 import (
-	"database/sql"
-	"time"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Attribute struct {
-	IDAttribute    int64  `json:"id_attribute"`
-	IDProfessional int64  `json:"id_professional"`
-	Attribute      string `json:"attribute"`
-	Value          string `json:"value"`
+	IDAttribute    int32            `json:"id_attribute"`
+	InsertedAt     pgtype.Timestamp `json:"inserted_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	IDProfessional int32            `json:"id_professional"`
+	Attribute      string           `json:"attribute"`
+	Value          string           `json:"value"`
 }
 
 type Availability struct {
-	IDAvailability   int64     `json:"id_availability"`
-	IDProfessional   int64     `json:"id_professional"`
-	InitDatetime     time.Time `json:"init_datetime"`
-	EndDatetime      time.Time `json:"end_datetime"`
-	InitHour         string    `json:"init_hour"`
-	EndHour          string    `json:"end_hour"`
-	TypeAvailability int64     `json:"type_availability"`
-	WeekdayName      string    `json:"weekday_name"`
-	Interval         int64     `json:"interval"`
-	Resting          int64     `json:"resting"`
-	PriorityEntry    int64     `json:"priority_entry"`
-	IsDeleted        int64     `json:"is_deleted"`
+	IDAvailability   int32            `json:"id_availability"`
+	InsertedAt       pgtype.Timestamp `json:"inserted_at"`
+	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
+	IDProfessional   int32            `json:"id_professional"`
+	InitDatetime     pgtype.Timestamp `json:"init_datetime"`
+	EndDatetime      pgtype.Timestamp `json:"end_datetime"`
+	InitHour         string           `json:"init_hour"`
+	EndHour          string           `json:"end_hour"`
+	TypeAvailability int32            `json:"type_availability"`
+	WeekdayName      string           `json:"weekday_name"`
+	Interval         int32            `json:"interval"`
+	Resting          int32            `json:"resting"`
+	PriorityEntry    int32            `json:"priority_entry"`
+	IsDeleted        bool             `json:"is_deleted"`
+	DeletedAt        pgtype.Timestamp `json:"deleted_at"`
 }
 
 type Blocker struct {
-	IDBlocker      int64          `json:"id_blocker"`
-	Title          string         `json:"title"`
-	Description    sql.NullString `json:"description"`
-	IDProfessional int64          `json:"id_professional"`
-	InitDatetime   time.Time      `json:"init_datetime"`
-	EndDatetime    time.Time      `json:"end_datetime"`
-	IsDeleted      int64          `json:"is_deleted"`
+	IDBlocker      int32            `json:"id_blocker"`
+	InsertedAt     pgtype.Timestamp `json:"inserted_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	Title          string           `json:"title"`
+	Description    pgtype.Text      `json:"description"`
+	IDProfessional int32            `json:"id_professional"`
+	InitDatetime   pgtype.Timestamp `json:"init_datetime"`
+	EndDatetime    pgtype.Timestamp `json:"end_datetime"`
+	IsDeleted      bool             `json:"is_deleted"`
+	DeletedAt      pgtype.Timestamp `json:"deleted_at"`
 }
 
 type Professional struct {
-	IDProfessional int64  `json:"id_professional"`
-	ReferenceKey   string `json:"reference_key"`
-	Especialidade  string `json:"especialidade"`
-	Nome           string `json:"nome"`
+	IDProfessional int32            `json:"id_professional"`
+	InsertedAt     pgtype.Timestamp `json:"inserted_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	ReferenceKey   string           `json:"reference_key"`
+	Especialidade  string           `json:"especialidade"`
+	Nome           string           `json:"nome"`
 }
 
 type Slot struct {
-	IDSlot         int64          `json:"id_slot"`
-	InsertedAt     time.Time      `json:"inserted_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	IDAvailability sql.NullInt64  `json:"id_availability"`
-	IDProfessional int64          `json:"id_professional"`
-	Slot           time.Time      `json:"slot"`
-	WeekdayName    string         `json:"weekday_name"`
-	Interval       int64          `json:"interval"`
-	PriorityEntry  int64          `json:"priority_entry"`
-	StatusEntry    string         `json:"status_entry"`
-	ExternalID     sql.NullString `json:"external_id"`
-	Owner          sql.NullString `json:"owner"`
-	IsDeleted      int64          `json:"is_deleted"`
-	DeletedAt      sql.NullTime   `json:"deleted_at"`
-	IDBlocker      sql.NullInt64  `json:"id_blocker"`
+	IDSlot         int32            `json:"id_slot"`
+	InsertedAt     pgtype.Timestamp `json:"inserted_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	IDAvailability pgtype.Int4      `json:"id_availability"`
+	IDProfessional int32            `json:"id_professional"`
+	Slot           pgtype.Timestamp `json:"slot"`
+	WeekdayName    string           `json:"weekday_name"`
+	Interval       int32            `json:"interval"`
+	PriorityEntry  int32            `json:"priority_entry"`
+	StatusEntry    string           `json:"status_entry"`
+	ExternalID     pgtype.Text      `json:"external_id"`
+	Owner          pgtype.Text      `json:"owner"`
+	IsDeleted      bool             `json:"is_deleted"`
+	DeletedAt      pgtype.Timestamp `json:"deleted_at"`
+	IDBlocker      pgtype.Int4      `json:"id_blocker"`
 }

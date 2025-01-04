@@ -2,20 +2,21 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
 	"timedev/db"
 	"timedev/sql/models"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 )
 
 func HandleListBlocker(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParams struct {
 		ReferenceKey string `param:"referencekey"`
@@ -30,7 +31,7 @@ func HandleListBlocker(c echo.Context) error {
 	queries := models.New(db)
 	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -53,7 +54,7 @@ func HandleListBlocker(c echo.Context) error {
 func HandleCreateBlocker(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParams struct {
 		ReferenceKey string    `param:"referencekey"`
@@ -70,8 +71,8 @@ func HandleCreateBlocker(c echo.Context) error {
 
 	queries := models.New(db)
 
-	tx, err := db.Begin()
-	defer tx.Rollback()
+	tx, err := db.Begin(ctx)
+	defer tx.Rollback(ctx)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
@@ -80,8 +81,8 @@ func HandleCreateBlocker(c echo.Context) error {
 
 	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		tx.Rollback()
-		if err == sql.ErrNoRows {
+		tx.Rollback(ctx)
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -90,9 +91,9 @@ func HandleCreateBlocker(c echo.Context) error {
 	blockUnit, err := qtx.InsertBlocker(ctx, models.InsertBlockerParams{
 		IDProfessional: professionalUnit.IDProfessional,
 		Title:          params.Title,
-		Description:    sql.NullString{String: params.Description, Valid: true},
-		InitDatetime:   params.Init,
-		EndDatetime:    params.End,
+		Description:    pgtype.Text{String: params.Description, Valid: true},
+		InitDatetime:   pgtype.Timestamp{Time: params.Init, Valid: true},
+		EndDatetime:    pgtype.Timestamp{Time: params.End, Valid: true},
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
@@ -103,15 +104,15 @@ func HandleCreateBlocker(c echo.Context) error {
 	slotBlocked, err := qtx.UpdateSlotSetBlocker(ctx, models.UpdateSlotSetBlockerParams{
 		IDProfessional: professionalUnit.IDProfessional,
 		StatusEntry:    "block",
-		IDBlocker:      sql.NullInt64{Int64: blockUnit.IDBlocker, Valid: true},
-		InitBlocker:    params.Init,
-		EndBlocker:     params.End,
+		IDBlocker:      pgtype.Int4{Int32: blockUnit.IDBlocker, Valid: true},
+		InitBlocker:    pgtype.Timestamp{Time: params.Init, Valid: true},
+		EndBlocker:     pgtype.Timestamp{Time: params.End, Valid: true},
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err)
 	}
 
-	tx.Commit()
+	tx.Commit(ctx)
 
 	return c.JSON(http.StatusOK, echo.Map{"professional": professionalUnit, "blocker": blockUnit, "slots_blocked": slotBlocked})
 }
@@ -119,11 +120,11 @@ func HandleCreateBlocker(c echo.Context) error {
 func HandleDeleteBlocker(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type UrlParams struct {
 		ReferenceKey string `param:"referencekey"`
-		IdBlocker    int64  `param:"idblocker"`
+		IdBlocker    int32  `param:"idblocker"`
 	}
 
 	var params UrlParams
@@ -135,8 +136,8 @@ func HandleDeleteBlocker(c echo.Context) error {
 
 	queries := models.New(db)
 
-	tx, err := db.Begin()
-	defer tx.Rollback()
+	tx, err := db.Begin(ctx)
+	defer tx.Rollback(ctx)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
@@ -145,8 +146,8 @@ func HandleDeleteBlocker(c echo.Context) error {
 
 	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		tx.Rollback()
-		if err == sql.ErrNoRows {
+		tx.Rollback(ctx)
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -154,8 +155,8 @@ func HandleDeleteBlocker(c echo.Context) error {
 
 	blockerDeleted, err := qtx.DeleteBlockerById(ctx, params.IdBlocker)
 	if err != nil {
-		tx.Rollback()
-		if err == sql.ErrNoRows {
+		tx.Rollback(ctx)
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -171,7 +172,7 @@ func HandleDeleteBlocker(c echo.Context) error {
 		c.JSON(http.StatusBadRequest, err)
 	}
 
-	tx.Commit()
+	tx.Commit(ctx)
 
 	return c.JSON(http.StatusOK, echo.Map{"professional": professionalUnit, "blocker": blockerDeleted, "slots_changed": slotChanged})
 }

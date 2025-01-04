@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func IsValidTypeAvailability(typeAv int64) bool {
+func IsValidTypeAvailability(typeAv int32) bool {
 	switch typeAv {
 	case 0, 2, 3:
 		return true

@@ -1,0 +1,18 @@
+﻿services:
+  go-api-starter:
+    image: go-api-starter
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080
+    user: root
+    volumes:
+      - ./:/app
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432

@@ -2,15 +2,15 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 	"timedev/db"
 	"timedev/repository"
 	"timedev/sql/models"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )
@@ -18,7 +18,7 @@ import (
 func HandleListAvailability(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey string `param:"referencekey"`
@@ -35,7 +35,7 @@ func HandleListAvailability(c echo.Context) error {
 
 	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -46,7 +46,7 @@ func HandleListAvailability(c echo.Context) error {
 		Deleted:        params.Deleted,
 	})
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, err)
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -59,12 +59,12 @@ func HandleDeleteAvailability(c echo.Context) error {
 	ctx := context.Background()
 
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey   string `param:"referencekey"`
 		Deleted        bool   `query:"deleted"`
-		IDAvailability int64  `param:"idavailability"`
+		IDAvailability int32  `param:"idavailability"`
 	}
 
 	var params urlParam
@@ -75,24 +75,23 @@ func HandleDeleteAvailability(c echo.Context) error {
 
 	queries := models.New(db)
 
-	tx, err := db.Begin()
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return c.JSON(http.StatusBadGateway, echo.Map{"error": "Failed to initialize a transaction"})
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	qtx := queries.WithTx(tx)
 
 	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		tx.Rollback()
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, sql.NullInt64{Int64: params.IDAvailability, Valid: true})
+	list_of_slots, err := qtx.ListSlotsByIdAvailability(ctx, pgtype.Int4{Int32: params.IDAvailability, Valid: true})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to load slots from availability", "description": err.Error()})
 	}
@@ -104,18 +103,16 @@ func HandleDeleteAvailability(c echo.Context) error {
 	for _, slot := range list_of_slots {
 		err := qtx.DeleteSlotById(ctx, slot)
 		if err != nil {
-			slotStr := strconv.FormatInt(slot, 10)
-			delete_slot_errors = append(delete_slot_errors, fmt.Sprint("Failed to mark slot as deleted", slotStr))
+			delete_slot_errors = append(delete_slot_errors, fmt.Sprint("Failed to mark slot as deleted", slot))
 		}
 	}
 
 	availabilityDeleted, err := qtx.DeleteAvailabilityById(ctx, params.IDAvailability)
 	if err != nil {
-		tx.Rollback()
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to mark availability as deleted."})
 	}
 
-	tx.Commit()
+	tx.Commit(ctx)
 
 	return c.JSON(http.StatusOK, echo.Map{"professional": professionalUnit, "deleted": availabilityDeleted, "description": "The slots marked as deleted", "errors": delete_slot_errors})
 }
@@ -124,22 +121,21 @@ func HandleCreateAvailability(c echo.Context) error {
 	ctx := context.Background()
 
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey     string    `param:"referencekey"`
-		IDAvailability   int64     `json:"id_availability"`
-		IDProfessional   int64     `json:"id_professional"`
+		IDAvailability   int32     `json:"id_availability"`
+		IDProfessional   int32     `json:"id_professional"`
 		InitDatetime     time.Time `json:"init_datetime"`
 		EndDatetime      time.Time `json:"end_datetime"`
 		InitHour         string    `json:"init_hour"`
 		EndHour          string    `json:"end_hour"`
-		TypeAvailability int64     `json:"type_availability"`
+		TypeAvailability int32     `json:"type_availability"`
 		WeekdayName      string    `json:"weekday_name"`
-		Interval         int64     `json:"interval"`
-		Resting          int64     `json:"resting"`
-		PriorityEntry    int64     `json:"priority_entry"`
-		IsDeleted        int64     `json:"is_deleted"`
+		Interval         int32     `json:"interval"`
+		Resting          int32     `json:"resting"`
+		PriorityEntry    int32     `json:"priority_entry"`
 	}
 
 	var params urlParam
@@ -166,17 +162,17 @@ func HandleCreateAvailability(c echo.Context) error {
 	queries := models.New(db)
 
 	// Instanciate new transaction
-	tx, err := db.Begin()
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return c.JSON(http.StatusBadGateway, echo.Map{"error": err, "description": "Cannot initialize db transaction"})
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	qtx := queries.WithTx(tx)
 
 	professionalUnit, err := qtx.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found"})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -192,8 +188,8 @@ func HandleCreateAvailability(c echo.Context) error {
 	// create an author
 	insertedAvailability, err := qtx.InsertAvailability(ctx, models.InsertAvailabilityParams{
 		IDProfessional:   professionalUnit.IDProfessional,
-		InitDatetime:     params.InitDatetime,
-		EndDatetime:      params.EndDatetime,
+		InitDatetime:     pgtype.Timestamp{Time: params.InitDatetime.In(time.UTC), Valid: true},
+		EndDatetime:      pgtype.Timestamp{Time: params.EndDatetime.In(time.UTC), Valid: true},
 		InitHour:         params.InitHour,
 		EndHour:          params.EndHour,
 		TypeAvailability: params.TypeAvailability,
@@ -207,8 +203,8 @@ func HandleCreateAvailability(c echo.Context) error {
 	}
 
 	slots, err := repository.ComputeSlots(
-		insertedAvailability.InitDatetime,
-		insertedAvailability.EndDatetime,
+		insertedAvailability.InitDatetime.Time,
+		insertedAvailability.EndDatetime.Time,
 		insertedAvailability.WeekdayName,
 		insertedAvailability.Interval,
 		insertedAvailability.Resting,
@@ -226,57 +222,55 @@ func HandleCreateAvailability(c echo.Context) error {
 
 		slotId, err := qtx.GetExistingSlot(ctx, models.GetExistingSlotParams{
 			IDProfessional: professionalUnit.IDProfessional,
-			Datetime:       slot,
+			Slot:           pgtype.Timestamp{Time: slot, Valid: true},
 			PriorityEntry:  insertedAvailability.PriorityEntry,
 		})
-		if (err != nil) && (err == sql.ErrNoRows) {
+		if (err != nil) && (err == pgx.ErrNoRows) {
 
 			type statusAndIdBlockerStruct struct {
-				idBlocker   sql.NullInt64
+				idBlocker   pgtype.Int4
 				statusEntry string
 			}
 			var statusAndBlocker statusAndIdBlockerStruct
 			statusAndBlocker.statusEntry = "open"
-			statusAndBlocker.idBlocker = sql.NullInt64{Valid: false}
+			statusAndBlocker.idBlocker = pgtype.Int4{Valid: false}
 
 			for _, blockUnit := range listBlockers {
-				if (blockUnit.InitDatetime.Before(slot)) && (blockUnit.EndDatetime.After(slot)) {
-					statusAndBlocker.idBlocker = sql.NullInt64{Int64: blockUnit.IDBlocker, Valid: true}
+				if (blockUnit.InitDatetime.Time.Before(slot)) && (blockUnit.EndDatetime.Time.After(slot)) {
+					statusAndBlocker.idBlocker = pgtype.Int4{Int32: blockUnit.IDBlocker, Valid: true}
 					statusAndBlocker.statusEntry = "block"
 				}
 			}
 
 			insertedSlot, err := qtx.InsertSlot(ctx, models.InsertSlotParams{
 				IDProfessional: professionalUnit.IDProfessional,
-				IDAvailability: sql.NullInt64{Int64: insertedAvailability.IDAvailability, Valid: true},
-				Slot:           slot,
+				IDAvailability: pgtype.Int4{Int32: insertedAvailability.IDAvailability, Valid: true},
+				Slot:           pgtype.Timestamp{Time: slot.In(time.UTC), Valid: true},
 				WeekdayName:    insertedAvailability.WeekdayName,
 				Interval:       insertedAvailability.Interval,
 				PriorityEntry:  insertedAvailability.PriorityEntry,
-				IsDeleted:      0,
 				StatusEntry:    statusAndBlocker.statusEntry,
 				IDBlocker:      statusAndBlocker.idBlocker,
 			})
 			if err != nil {
-				slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to insert."))
+				slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to insert.", err))
 			}
 
-			slots_added = append(slots_added, insertedSlot)
+			slots_added = append(slots_added, insertedSlot.Slot.Time)
 
-		} else if (err != nil) && (err != sql.ErrNoRows) {
-			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to get state of slot."))
+		} else if (err != nil) && (err != pgx.ErrNoRows) {
+			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Failed to get state of slot.", err))
 		} else {
 			slot_non_added = append(slot_non_added, fmt.Sprint(slot.Format("2006-01-02 15:04:05+00:00"), " Trying to insert in a busy slot.", slotId))
 		}
 	}
 
 	if slots_added == nil {
-		tx.Rollback()
-		return c.JSON(http.StatusBadRequest, echo.Map{"error(s)	": "None slots and availability were added. All slots were in busy slots."})
+		return c.JSON(http.StatusBadRequest, echo.Map{"error(s)	": "None slots and availability were added. All slots were in busy slots.", "slots_not_added": slot_non_added})
 	}
 
 	// Commit the transaction
-	tx.Commit()
+	tx.Commit(ctx)
 
 	return c.JSON(http.StatusOK, echo.Map{"professional": professionalUnit, "availability": insertedAvailability, "slots_added": slots_added, "slots_not_added": slot_non_added})
 }
@@ -285,12 +279,12 @@ func HandleGetAvailability(c echo.Context) error {
 	ctx := context.Background()
 
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey   string `param:"referencekey"`
 		Deleted        bool   `query:"deleted"`
-		IDAvailability int64  `param:"idavailability"`
+		IDAvailability int32  `param:"idavailability"`
 	}
 
 	var params urlParam
@@ -303,7 +297,7 @@ func HandleGetAvailability(c echo.Context) error {
 
 	professionalUnit, err := queries.GetProfessionalInfo(ctx, params.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -311,7 +305,7 @@ func HandleGetAvailability(c echo.Context) error {
 
 	unitAvailability, err := queries.ListAvailability(ctx, params.IDAvailability)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNoContent, err)
 		}
 

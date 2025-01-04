@@ -1,26 +1,25 @@
 package db
 
 import (
+	"context"
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 
-	"database/sql"
-
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx/v5" // Import the PostgreSQL driver
 )
 
-func OpenDBConnection() *sql.DB {
+func OpenDBConnection() *pgx.Conn {
 
-	var database *sql.DB
-	sqlpath := os.Getenv("SQLITE_PATH")
+	// Replace with your actual PostgreSQL connection string
+	connStr := os.Getenv("POSTGRES_URI")
 
-	var err error
-	database, err = sql.Open("sqlite3", sqlpath)
-
+	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
 	}
 
-	return database
+	fmt.Println("Connected to PostgreSQL database")
+	return conn
 }

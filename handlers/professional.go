@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"net/http"
 	"timedev/db"
 	"timedev/sql/models"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )
@@ -15,7 +14,7 @@ import (
 func HandleGetProfessional(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey string `param:"referencekey"`
@@ -32,7 +31,7 @@ func HandleGetProfessional(c echo.Context) error {
 
 	professionalValue, err := queries.GetProfessionalInfo(ctx, param.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNoContent, err)
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -64,7 +63,7 @@ func HandleGetProfessional(c echo.Context) error {
 func HandleCreateProfessional(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	var professionalUnit models.Professional
 
@@ -91,12 +90,12 @@ func HandleCreateProfessional(c echo.Context) error {
 func HandleCreateAttribute(c echo.Context) error {
 	ctx := context.Background()
 	db := db.OpenDBConnection()
-	defer db.Close()
+	defer db.Close(ctx)
 
 	type urlParam struct {
 		ReferenceKey   string `param:"referencekey"`
-		IDAttribute    int64  `json:"id_attribute"`
-		IDProfessional int64  `json:"id_professional"`
+		IDAttribute    int32  `json:"id_attribute"`
+		IDProfessional int32  `json:"id_professional"`
 		Attribute      string `json:"attribute"`
 		Value          string `json:"value"`
 	}
@@ -109,18 +108,17 @@ func HandleCreateAttribute(c echo.Context) error {
 	}
 
 	queries := models.New(db)
-	tx, err := db.Begin()
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to initialize a transaction"})
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	qtx := queries.WithTx(tx)
 
 	professionalUnit, err := qtx.GetProfessionalInfo(ctx, param.ReferenceKey)
-	fmt.Printf("param.ReferenceKey: %v\n", param.ReferenceKey)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "Professional not found."})
 		}
 		return c.JSON(http.StatusBadRequest, err)
@@ -132,11 +130,11 @@ func HandleCreateAttribute(c echo.Context) error {
 		Value:          param.Value,
 	})
 	if err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed to insert Attribute", "description": err.Error()})
 	}
 
-	tx.Commit()
+	tx.Commit(ctx)
 
 	return c.JSON(http.StatusOK, echo.Map{"user": professionalUnit, "attributes": insertedAttribute})
 }

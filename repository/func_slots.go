@@ -29,7 +29,7 @@ func computeWeekdayName(weekday string) (time.Weekday, error) {
 	return weekdayName, nil
 }
 
-func ComputeSlots(startDatetime, endDatetime time.Time, weekday string, intervalDuration, restingDuration, typeavailability int64, hour_init, hour_end string) ([]time.Time, error) {
+func ComputeSlots(startDatetime, endDatetime time.Time, weekday string, intervalDuration, restingDuration, typeavailability int32, hour_init, hour_end string) ([]time.Time, error) {
 	weekdayName, err := computeWeekdayName(weekday)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func ComputeSlots(startDatetime, endDatetime time.Time, weekday string, interval
 	return slots, nil
 }
 
-func CalculateWeekdayBetween(start, end time.Time, targetWeekday time.Weekday, typeInterval int64) []time.Time {
+func CalculateWeekdayBetween(start, end time.Time, targetWeekday time.Weekday, typeInterval int32) []time.Time {
 	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
 	end = time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, end.Location())
 
@@ -117,12 +117,12 @@ func SplitTimeRange(hourStart, hourEnd time.Time, interval, resting time.Duratio
 
 	var slots []time.Time
 	current := hourStart
-	slots = append(slots, current)
+	slots = append(slots, current.In(hourStart.Location()))
 
 	// Keep adding intervals until we reach or exceed the end time
 	for current.Add(interval).Add(resting).Before(hourEnd) {
 		current = current.Add(interval).Add(resting)
-		slots = append(slots, current)
+		slots = append(slots, current.In(hourStart.Location()))
 	}
 
 	return slots

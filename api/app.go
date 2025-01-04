@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 	"timedev/config"
 	"timedev/db"
 	"timedev/logging"
@@ -32,27 +33,33 @@ func SetupAndRunApp() error {
 		return errLog
 	}
 
+	location, err_tz := time.LoadLocation(os.Getenv("TIMEZONE"))
+	if err_tz != nil {
+		panic(err_tz)
+	}
+	time.Local = location
+
 	log.Println("calling OpenDBConnection()")
+
+	initialize_script_db := `
+  
+  drop table if exists slot; 
+  drop table if exists availability; 
+  drop table if exists blocker;
+  drop table if exists attribute;
+  drop table if exists professional;  `
+
+	ctx := context.Background()
 	// Initialize the database connection
 	dbConnection := db.OpenDBConnection()
-	defer dbConnection.Close()
+	defer dbConnection.Close(ctx)
 
 	ddl, errSchema := os.ReadFile("./sql/schema.sql")
 	if errSchema != nil {
 		log.Fatal(errSchema)
 	}
-
-	initialize_script_db := `
-  drop table if exists blocker;
-  drop table if exists slot; 
-  drop table if exists availability; 
-  drop table if exists professional; 
-  drop table if exists attribute; 
-  pragma foreign_keys = on;`
-
-	ctx := context.Background()
 	// create tables
-	if _, err := dbConnection.ExecContext(ctx, fmt.Sprintf("%s; %s", initialize_script_db, ddl)); err != nil {
+	if _, err := dbConnection.Exec(ctx, fmt.Sprintf("%s; %s", initialize_script_db, ddl)); err != nil {
 		log.Fatal(err)
 	}
 
