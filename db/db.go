@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"log"
 	"os"
 
@@ -20,6 +19,5 @@ func OpenDBConnection() *pgx.Conn {
 		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
 	}
 
-	fmt.Println("Connected to PostgreSQL database")
 	return conn
 }

@@ -20,7 +20,7 @@ func SetupRoutes(app *echo.Echo) {
 	// professional
 	api.GET("/professional/:referencekey", handlers.HandleGetProfessional)
 	api.POST("/professional", handlers.HandleCreateProfessional)
-	api.POST("/professional/:referencekey/attributes", handlers.HandleCreateAttribute)
+	api.POST("/professional/:referencekey/attribute", handlers.HandleCreateAttribute)
 
 	// availability
 	api.DELETE("/professional/:referencekey/availability/:idavailability", handlers.HandleDeleteAvailability)
