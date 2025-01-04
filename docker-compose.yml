@@ -5,7 +5,7 @@
       context: .
       dockerfile: Dockerfile
     ports:
-      - 8080:8080
+      - 9876:9876
     user: root
     volumes:
       - ./:/app
