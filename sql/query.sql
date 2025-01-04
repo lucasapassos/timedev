@@ -134,6 +134,25 @@ WHERE 1=1
   ) ELSE true END
 ORDER BY s.slot;
 
+-- name: ListSlotsSummary :many
+SELECT
+  date_trunc(@timing::varchar, s.slot)::timestamp as timeref,
+	s.status_entry,
+	count(*) as counting
+FROM slot s
+LEFT JOIN professional p on s.id_professional = p.id_professional
+WHERE 1=1
+  AND CASE WHEN @deleted = true THEN true ELSE is_deleted = false END
+  AND CASE WHEN @is_hour = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast(@init_hour::varchar as time) and cast(@end_hour::varchar as time) ELSE true END
+  AND slot between @slot_init and @slot_end
+  AND CASE WHEN @is_professional = true THEN p.reference_key = ANY(@reference_key::varchar[]) ELSE true END
+  AND CASE WHEN @is_open = true THEN s.status_entry = 'open' ELSE true END
+  AND CASE WHEN @is_especialidade = true THEN p.especialidade = ANY(@especialidade::varchar[]) ELSE true END
+  AND CASE WHEN @is_idclinica = true THEN s.id_professional in (
+    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY(@idclinica::varchar[])
+  ) ELSE true END
+GROUP BY 1,2
+ORDER BY 1,2;
 
 
 -- name: ListSlotsByIdAvailability :many

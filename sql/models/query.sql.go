@@ -910,6 +910,85 @@ func (q *Queries) ListSlotsByIdAvailability(ctx context.Context, idAvailability 
 	return items, nil
 }
 
+const listSlotsSummary = `-- name: ListSlotsSummary :many
+SELECT
+  date_trunc($1::varchar, s.slot)::timestamp as timeref,
+	s.status_entry,
+	count(*) as counting
+FROM slot s
+LEFT JOIN professional p on s.id_professional = p.id_professional
+WHERE 1=1
+  AND CASE WHEN $2 = true THEN true ELSE is_deleted = false END
+  AND CASE WHEN $3 = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast($4::varchar as time) and cast($5::varchar as time) ELSE true END
+  AND slot between $6 and $7
+  AND CASE WHEN $8 = true THEN p.reference_key = ANY($9::varchar[]) ELSE true END
+  AND CASE WHEN $10 = true THEN s.status_entry = 'open' ELSE true END
+  AND CASE WHEN $11 = true THEN p.especialidade = ANY($12::varchar[]) ELSE true END
+  AND CASE WHEN $13 = true THEN s.id_professional in (
+    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY($14::varchar[])
+  ) ELSE true END
+GROUP BY 1,2
+ORDER BY 1,2
+`
+
+type ListSlotsSummaryParams struct {
+	Timing          string           `json:"timing"`
+	Deleted         interface{}      `json:"deleted"`
+	IsHour          interface{}      `json:"is_hour"`
+	InitHour        string           `json:"init_hour"`
+	EndHour         string           `json:"end_hour"`
+	SlotInit        pgtype.Timestamp `json:"slot_init"`
+	SlotEnd         pgtype.Timestamp `json:"slot_end"`
+	IsProfessional  interface{}      `json:"is_professional"`
+	ReferenceKey    []string         `json:"reference_key"`
+	IsOpen          interface{}      `json:"is_open"`
+	IsEspecialidade interface{}      `json:"is_especialidade"`
+	Especialidade   []string         `json:"especialidade"`
+	IsIdclinica     interface{}      `json:"is_idclinica"`
+	Idclinica       []string         `json:"idclinica"`
+}
+
+type ListSlotsSummaryRow struct {
+	Timeref     pgtype.Timestamp `json:"timeref"`
+	StatusEntry string           `json:"status_entry"`
+	Counting    int64            `json:"counting"`
+}
+
+func (q *Queries) ListSlotsSummary(ctx context.Context, arg ListSlotsSummaryParams) ([]ListSlotsSummaryRow, error) {
+	rows, err := q.db.Query(ctx, listSlotsSummary,
+		arg.Timing,
+		arg.Deleted,
+		arg.IsHour,
+		arg.InitHour,
+		arg.EndHour,
+		arg.SlotInit,
+		arg.SlotEnd,
+		arg.IsProfessional,
+		arg.ReferenceKey,
+		arg.IsOpen,
+		arg.IsEspecialidade,
+		arg.Especialidade,
+		arg.IsIdclinica,
+		arg.Idclinica,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSlotsSummaryRow
+	for rows.Next() {
+		var i ListSlotsSummaryRow
+		if err := rows.Scan(&i.Timeref, &i.StatusEntry, &i.Counting); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateSlot = `-- name: UpdateSlot :one
 UPDATE slot
 SET status_entry = $1,
