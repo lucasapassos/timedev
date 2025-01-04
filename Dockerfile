@@ -4,6 +4,7 @@ WORKDIR /app
 RUN go install github.com/air-verse/air@latest
 COPY . .
 RUN go mod download
+RUN sqlc generate -f /app/sql/sqlc.yaml
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o server .
 
 # set executable
