@@ -68,7 +68,7 @@ type Slot struct {
 	Interval       int32            `json:"interval"`
 	PriorityEntry  int32            `json:"priority_entry"`
 	StatusEntry    string           `json:"status_entry"`
-	ExternalID     pgtype.Text      `json:"external_id"`
+	IDExternal     pgtype.Text      `json:"id_external"`
 	Owner          pgtype.Text      `json:"owner"`
 	IsDeleted      bool             `json:"is_deleted"`
 	DeletedAt      pgtype.Timestamp `json:"deleted_at"`

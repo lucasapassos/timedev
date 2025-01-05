@@ -86,7 +86,7 @@ create table slot (
   interval INTEGER NOT NULL,
   priority_entry INTEGER NOT NULL,
   status_entry TEXT NOT NULL,
-  external_id TEXT,
+  id_external TEXT,
   owner TEXT,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
   deleted_at TIMESTAMP,
@@ -94,14 +94,14 @@ create table slot (
   FOREIGN KEY(id_blocker) REFERENCES blocker(id_blocker),
   FOREIGN KEY(id_availability) REFERENCES availability(id_availability),
   FOREIGN KEY(id_professional) REFERENCES professional(id_professional),
-  CHECK (status_entry IN ('open', 'busy', 'block', 'reserved'))
+  CHECK (status_entry IN ('open', 'busy', 'block', 'reserved', 'canceled'))
 );
 create index idx_slot_availability on slot (id_availability);
 create index idx_slot_professional on slot (id_professional);
 create index idx_slot_slot on slot (slot);
 create index idx_slot_interval on slot (interval);
 create index idx_slot_priority on slot (priority_entry);
-create index idx_slot_external_id on slot (external_id);
+create index idx_slot_external_id on slot (id_external);
 create index idx_slot_deleted on slot (is_deleted);
 create index idx_slot_blocker on slot (id_blocker);
 
