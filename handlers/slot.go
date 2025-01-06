@@ -114,15 +114,16 @@ func HandleListSlots(c echo.Context) error {
 	defer db.Close(ctx)
 
 	type SlotUnit struct {
-		ReferenceKey  string    `query:"reference_key"`
-		IdClinica     string    `query:"idclinica"`
-		SlotInit      time.Time `query:"slot_init"`
-		SlotEnd       time.Time `query:"slot_end"`
-		HourInit      string    `query:"hour_init"`
-		HourEnd       string    `query:"hour_end"`
-		IsOpen        bool      `query:"is_open"`
-		Especialidade string    `query:"especialidade"`
-		IsDeleted     bool      `query:"deleted"`
+		ReferenceKey    string    `query:"reference_key"`
+		IdClinica       string    `query:"idclinica"`
+		SlotInit        time.Time `query:"slot_init"`
+		SlotEnd         time.Time `query:"slot_end"`
+		HourInit        string    `query:"hour_init"`
+		HourEnd         string    `query:"hour_end"`
+		IsOpen          bool      `query:"is_open"`
+		Especialidade   string    `query:"especialidade"`
+		IsDeleted       bool      `query:"deleted"`
+		TimingReference string    `query:"timing_reference"`
 	}
 
 	var slotUnit SlotUnit
@@ -137,6 +138,11 @@ func HandleListSlots(c echo.Context) error {
 		} else {
 			is_hour = true
 		}
+	}
+
+	var is_timing_reference bool
+	if slotUnit.TimingReference != "" {
+		is_timing_reference = true
 	}
 
 	var is_professional bool
@@ -156,26 +162,48 @@ func HandleListSlots(c echo.Context) error {
 
 	queries := models.New(db)
 
-	slots, err := queries.ListSlots(ctx, models.ListSlotsParams{
-		SlotInit:        pgtype.Timestamp{Time: slotUnit.SlotInit, Valid: slotUnit.SlotInit != time.Time{}},
-		SlotEnd:         pgtype.Timestamp{Time: slotUnit.SlotEnd, Valid: slotUnit.SlotEnd != time.Time{}},
-		IsProfessional:  is_professional,
-		ReferenceKey:    strings.Split(slotUnit.ReferenceKey, ","),
-		IsIdclinica:     is_idclinica,
-		Idclinica:       strings.Split(slotUnit.IdClinica, ","),
-		IsOpen:          slotUnit.IsOpen,
-		IsEspecialidade: is_especialidade,
-		Especialidade:   strings.Split(slotUnit.Especialidade, ","),
-		Deleted:         slotUnit.IsDeleted,
-		IsHour:          is_hour,
-		InitHour:        slotUnit.HourInit,
-		EndHour:         slotUnit.HourEnd,
-	})
-	if err != nil {
-		c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
+	if is_timing_reference {
+		slots, err := queries.ListSlotsSummary(ctx, models.ListSlotsSummaryParams{
+			SlotInit:        pgtype.Timestamp{Time: slotUnit.SlotInit, Valid: slotUnit.SlotInit != time.Time{}},
+			SlotEnd:         pgtype.Timestamp{Time: slotUnit.SlotEnd, Valid: slotUnit.SlotEnd != time.Time{}},
+			IsProfessional:  is_professional,
+			ReferenceKey:    strings.Split(slotUnit.ReferenceKey, ","),
+			IsIdclinica:     is_idclinica,
+			Idclinica:       strings.Split(slotUnit.IdClinica, ","),
+			IsOpen:          slotUnit.IsOpen,
+			IsEspecialidade: is_especialidade,
+			Especialidade:   strings.Split(slotUnit.Especialidade, ","),
+			Deleted:         slotUnit.IsDeleted,
+			IsHour:          is_hour,
+			InitHour:        slotUnit.HourInit,
+			EndHour:         slotUnit.HourEnd,
+			Timing:          slotUnit.TimingReference,
+		})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
+		}
+		return c.JSON(http.StatusOK, slots)
+	} else {
+		slots, err := queries.ListSlots(ctx, models.ListSlotsParams{
+			SlotInit:        pgtype.Timestamp{Time: slotUnit.SlotInit, Valid: slotUnit.SlotInit != time.Time{}},
+			SlotEnd:         pgtype.Timestamp{Time: slotUnit.SlotEnd, Valid: slotUnit.SlotEnd != time.Time{}},
+			IsProfessional:  is_professional,
+			ReferenceKey:    strings.Split(slotUnit.ReferenceKey, ","),
+			IsIdclinica:     is_idclinica,
+			Idclinica:       strings.Split(slotUnit.IdClinica, ","),
+			IsOpen:          slotUnit.IsOpen,
+			IsEspecialidade: is_especialidade,
+			Especialidade:   strings.Split(slotUnit.Especialidade, ","),
+			Deleted:         slotUnit.IsDeleted,
+			IsHour:          is_hour,
+			InitHour:        slotUnit.HourInit,
+			EndHour:         slotUnit.HourEnd,
+		})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
+		}
+		return c.JSON(http.StatusOK, slots)
 	}
-
-	return c.JSON(http.StatusOK, slots)
 }
 
 func HandleUpdateSlot(c echo.Context) error {
@@ -188,7 +216,7 @@ func HandleUpdateSlot(c echo.Context) error {
 		PriorityEntry int32  `json:"priority_entry"`
 		StatusEntry   string `json:"status_entry"`
 		Owner         string `json:"owner"`
-		ExternalID    string `json:"external_id"`
+		IDExternal    string `json:"id_external"`
 	}
 
 	var receivedData receivedDataStruct
@@ -225,8 +253,8 @@ func HandleUpdateSlot(c echo.Context) error {
 		slotUnit.Owner = pgtype.Text{String: receivedData.Owner, Valid: receivedData.Owner != ""}
 	}
 
-	if receivedData.ExternalID != "" {
-		slotUnit.ExternalID = pgtype.Text{String: receivedData.ExternalID, Valid: receivedData.ExternalID != ""}
+	if receivedData.IDExternal != "" {
+		slotUnit.IDExternal = pgtype.Text{String: receivedData.IDExternal, Valid: receivedData.IDExternal != ""}
 	}
 
 	updatedSlot, err := queries.UpdateSlot(ctx, models.UpdateSlotParams{
@@ -234,7 +262,7 @@ func HandleUpdateSlot(c echo.Context) error {
 		PriorityEntry: slotUnit.PriorityEntry,
 		StatusEntry:   slotUnit.StatusEntry,
 		Owner:         slotUnit.Owner,
-		ExternalID:    slotUnit.ExternalID,
+		IDExternal:    slotUnit.IDExternal,
 	})
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to update slot", "description": err.Error()})
