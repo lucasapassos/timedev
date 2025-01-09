@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"timedev/db"
@@ -124,6 +125,7 @@ func HandleListSlots(c echo.Context) error {
 		Especialidade   string    `query:"especialidade"`
 		IsDeleted       bool      `query:"deleted"`
 		TimingReference string    `query:"timing_reference"`
+		PriorityEntry   string    `query:"priority_entry"`
 	}
 
 	var slotUnit SlotUnit
@@ -160,6 +162,19 @@ func HandleListSlots(c echo.Context) error {
 		is_especialidade = true
 	}
 
+	priorityEntries := []int32{}
+	var is_priority_entry bool
+	if slotUnit.PriorityEntry != "" {
+		for _, entry := range strings.Split(slotUnit.PriorityEntry, ",") {
+			priorityEntry, err := strconv.Atoi(entry)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid priority entry format"})
+			}
+			priorityEntries = append(priorityEntries, int32(priorityEntry))
+		}
+		is_priority_entry = true
+	}
+
 	queries := models.New(db)
 
 	if is_timing_reference {
@@ -178,6 +193,8 @@ func HandleListSlots(c echo.Context) error {
 			InitHour:        slotUnit.HourInit,
 			EndHour:         slotUnit.HourEnd,
 			Timing:          slotUnit.TimingReference,
+			IsPriorityEntry: is_priority_entry,
+			PriorityEntry:   priorityEntries,
 		})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})
@@ -198,6 +215,8 @@ func HandleListSlots(c echo.Context) error {
 			IsHour:          is_hour,
 			InitHour:        slotUnit.HourInit,
 			EndHour:         slotUnit.HourEnd,
+			IsPriorityEntry: is_priority_entry,
+			PriorityEntry:   priorityEntries,
 		})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, echo.Map{"error": "Failed or Nothing to see here...", "description": err.Error()})

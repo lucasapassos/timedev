@@ -64,6 +64,7 @@ WHERE 1=1
   AND CASE WHEN @deleted = true THEN true ELSE is_deleted = false END
   AND CASE WHEN @is_hour = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast(@init_hour::varchar as time) and cast(@end_hour::varchar as time) ELSE true END
   AND slot between @slot_init and @slot_end
+  AND CASE WHEN @is_priority_entry = true THEN s.priority_entry = ANY(@priority_entry::integer[]) ELSE true END
   AND CASE WHEN @is_professional = true THEN p.reference_key = ANY(@reference_key::varchar[]) ELSE true END
   AND CASE WHEN @is_open = true THEN s.status_entry = 'open' ELSE true END
   AND CASE WHEN @is_especialidade = true THEN p.especialidade = ANY(@especialidade::varchar[]) ELSE true END
@@ -84,6 +85,7 @@ WHERE 1=1
   AND CASE WHEN @is_hour = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast(@init_hour::varchar as time) and cast(@end_hour::varchar as time) ELSE true END
   AND slot between @slot_init and @slot_end
   AND CASE WHEN @is_professional = true THEN p.reference_key = ANY(@reference_key::varchar[]) ELSE true END
+  AND CASE WHEN @is_priority_entry = true THEN s.priority_entry = ANY(@priority_entry::integer[]) ELSE true END
   AND CASE WHEN @is_open = true THEN s.status_entry = 'open' ELSE true END
   AND CASE WHEN @is_especialidade = true THEN p.especialidade = ANY(@especialidade::varchar[]) ELSE true END
   AND CASE WHEN @is_idclinica = true THEN s.id_professional in (

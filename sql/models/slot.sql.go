@@ -251,11 +251,12 @@ WHERE 1=1
   AND CASE WHEN $1 = true THEN true ELSE is_deleted = false END
   AND CASE WHEN $2 = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast($3::varchar as time) and cast($4::varchar as time) ELSE true END
   AND slot between $5 and $6
-  AND CASE WHEN $7 = true THEN p.reference_key = ANY($8::varchar[]) ELSE true END
-  AND CASE WHEN $9 = true THEN s.status_entry = 'open' ELSE true END
-  AND CASE WHEN $10 = true THEN p.especialidade = ANY($11::varchar[]) ELSE true END
-  AND CASE WHEN $12 = true THEN s.id_professional in (
-    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY($13::varchar[])
+  AND CASE WHEN $7 = true THEN s.priority_entry = ANY($8::integer[]) ELSE true END
+  AND CASE WHEN $9 = true THEN p.reference_key = ANY($10::varchar[]) ELSE true END
+  AND CASE WHEN $11 = true THEN s.status_entry = 'open' ELSE true END
+  AND CASE WHEN $12 = true THEN p.especialidade = ANY($13::varchar[]) ELSE true END
+  AND CASE WHEN $14 = true THEN s.id_professional in (
+    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY($15::varchar[])
   ) ELSE true END
 ORDER BY s.slot
 `
@@ -267,6 +268,8 @@ type ListSlotsParams struct {
 	EndHour         string           `json:"end_hour"`
 	SlotInit        pgtype.Timestamp `json:"slot_init"`
 	SlotEnd         pgtype.Timestamp `json:"slot_end"`
+	IsPriorityEntry interface{}      `json:"is_priority_entry"`
+	PriorityEntry   []int32          `json:"priority_entry"`
 	IsProfessional  interface{}      `json:"is_professional"`
 	ReferenceKey    []string         `json:"reference_key"`
 	IsOpen          interface{}      `json:"is_open"`
@@ -303,6 +306,8 @@ func (q *Queries) ListSlots(ctx context.Context, arg ListSlotsParams) ([]ListSlo
 		arg.EndHour,
 		arg.SlotInit,
 		arg.SlotEnd,
+		arg.IsPriorityEntry,
+		arg.PriorityEntry,
 		arg.IsProfessional,
 		arg.ReferenceKey,
 		arg.IsOpen,
@@ -387,10 +392,11 @@ WHERE 1=1
   AND CASE WHEN $3 = true THEN cast(concat(extract(hour from slot), ':', extract(minute from slot)) as time) between cast($4::varchar as time) and cast($5::varchar as time) ELSE true END
   AND slot between $6 and $7
   AND CASE WHEN $8 = true THEN p.reference_key = ANY($9::varchar[]) ELSE true END
-  AND CASE WHEN $10 = true THEN s.status_entry = 'open' ELSE true END
-  AND CASE WHEN $11 = true THEN p.especialidade = ANY($12::varchar[]) ELSE true END
-  AND CASE WHEN $13 = true THEN s.id_professional in (
-    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY($14::varchar[])
+  AND CASE WHEN $10 = true THEN s.priority_entry = ANY($11::integer[]) ELSE true END
+  AND CASE WHEN $12 = true THEN s.status_entry = 'open' ELSE true END
+  AND CASE WHEN $13 = true THEN p.especialidade = ANY($14::varchar[]) ELSE true END
+  AND CASE WHEN $15 = true THEN s.id_professional in (
+    SELECT a.id_professional FROM attribute a WHERE attribute = 'idclinica' and value = ANY($16::varchar[])
   ) ELSE true END
 GROUP BY 1,2
 ORDER BY 1,2
@@ -406,6 +412,8 @@ type ListSlotsSummaryParams struct {
 	SlotEnd         pgtype.Timestamp `json:"slot_end"`
 	IsProfessional  interface{}      `json:"is_professional"`
 	ReferenceKey    []string         `json:"reference_key"`
+	IsPriorityEntry interface{}      `json:"is_priority_entry"`
+	PriorityEntry   []int32          `json:"priority_entry"`
 	IsOpen          interface{}      `json:"is_open"`
 	IsEspecialidade interface{}      `json:"is_especialidade"`
 	Especialidade   []string         `json:"especialidade"`
@@ -430,6 +438,8 @@ func (q *Queries) ListSlotsSummary(ctx context.Context, arg ListSlotsSummaryPara
 		arg.SlotEnd,
 		arg.IsProfessional,
 		arg.ReferenceKey,
+		arg.IsPriorityEntry,
+		arg.PriorityEntry,
 		arg.IsOpen,
 		arg.IsEspecialidade,
 		arg.Especialidade,

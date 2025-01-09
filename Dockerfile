@@ -2,6 +2,7 @@
 FROM golang:1.23-alpine AS build
 WORKDIR /app
 RUN go install github.com/air-verse/air@latest
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 COPY . .
 RUN go mod download
 RUN sqlc generate -f /app/sql/sqlc.yaml
